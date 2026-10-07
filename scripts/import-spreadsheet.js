@@ -103,45 +103,118 @@ async function main() {
     return;
   }
 
-  const columns = Object.keys(rows[0]);
-  const { db, close } = openDatabase(config, logger);
+      const columns = Object.keys(rows[0]);
+      const { db, close } = openDatabase(config, logger);
 
-  try {
-    if (opts.table === 'audit_log' || opts.table === 'dataset_records') {
-      logger.warn(`[import] ${opts.table} is normally written by triggers; importing anyway`);
-    }
-
-    if (opts.replace) {
-      db.prepare(`DELETE FROM ${quoteIdent(opts.table)}`).run();
-      logger.warn(`[import] cleared existing rows from ${opts.table}`);
-    }
-
-    const sql = `INSERT INTO ${quoteIdent(opts.table)} (${columns.map(quoteIdent).join(', ')})
-                 VALUES (${columns.map(() => '?').join(', ')})`;
-    const statement = db.prepare(sql);
-
-    let inserted = 0;
-    let failed = 0;
-    const insertMany = db.transaction((batch) => {
-      for (const row of batch) {
-        const values = columns.map((c) => (opts.coerce ? coerceCell(row[c]) : row[c]));
-        try {
-          statement.run(...values);
-          inserted += 1;
-        } catch (err) {
-          failed += 1;
-          logger.warn(`[import] row rejected (${err.message})`);
+      try {
+        if (opts.table === 'audit_log' || opts.table === 'dataset_records') {
+          logger.warn(`[import] ${opts.table} is normally written by triggers; importing anyway`);
         }
+
+        // Read the target schema so a blank cell can mean "not specified" rather
+        // than "set this to NULL". Binding NULL explicitly overrides a column's
+        // DEFAULT, so a file with a missing password_hash cell used to fail on
+        // NOT NULL DEFAULT '' instead of taking the default.
+        const schema = db.prepare(`PRAGMA table_info(${quoteIdent(opts.table)})`).all();
+        if (!schema.length) {
+          throw new Error(`Table not found: ${opts.table}`);
+        }
+
+        const known = new Map(schema.map((c) => [c.name, c]));
+
+        // Warn about headers the file has that the table does not.
+        const unknown = columns.filter((c) => !known.has(c));
+        if (unknown.length) {
+          logger.warn(`[import] ignoring column(s) not in ${opts.table}: ${unknown.join(', ')}`);
+        }
+
+        const usable = columns.filter((c) => known.has(c));
+        if (!usable.length) {
+          throw new Error(`None of the file's columns exist in ${opts.table}`);
+        }
+
+        // Report required columns the file does not supply at all - those can
+        // only work if the schema has a default for them.
+        const missing = schema
+          .filter((c) => c.notnull && c.dflt_value === null && c.pk === 0 && !usable.includes(c.name))
+          .map((c) => c.name);
+        if (missing.length) {
+          logger.warn(`[import] ${opts.table} requires ${missing.join(', ')} with no default; rows will be rejected unless the table supplies them`);
+        }
+
+        if (opts.replace) {
+          db.prepare(`DELETE FROM ${quoteIdent(opts.table)}`).run();
+          logger.warn(`[import] cleared existing rows from ${opts.table}`);
+        }
+
+        // One prepared statement per distinct column set. A blank cell drops its
+        // column from that row's INSERT, so the schema default applies. The
+        // cache keeps this to a handful of statements for a normal file.
+        const statements = new Map();
+        const statementFor = (names) => {
+          const key = names.join(',');
+          if (!statements.has(key)) {
+            statements.set(key, db.prepare(
+              `INSERT INTO ${quoteIdent(opts.table)} (${names.map(quoteIdent).join(', ')})
+  `
+              + `VALUES (${names.map(() => '?').join(', ')})`,
+            ));
+          }
+          return statements.get(key);
+        };
+
+        let inserted = 0;
+        let failed = 0;
+        const failures = [];
+
+        const insertMany = db.transaction((batch) => {
+          for (const [index, row] of batch.entries()) {
+            // A cell that is absent, or present but blank, means "use the
+            // default". An explicit "NULL" is the one way to ask for a real
+            // null, which keeps that option open for a nullable column.
+            const names = [];
+            const values = [];
+
+            for (const name of usable) {
+              const raw = row[name];
+              const blank = raw === undefined || raw === null || String(raw).trim() === '';
+              if (blank) continue;
+              names.push(name);
+              values.push(opts.coerce ? coerceCell(raw) : raw);
+            }
+
+            if (!names.length) {
+              failed += 1;
+              failures.push(`row ${index + 1}: every column was empty`);
+              continue;
+            }
+
+            try {
+              statementFor(names).run(...values);
+              inserted += 1;
+            } catch (err) {
+              failed += 1;
+              failures.push(`row ${index + 1}: ${err.message}`);
+            }
+          }
+        });
+
+        insertMany(rows);
+
+        // Show the first few reasons rather than one line per rejected row: a
+        // thousand identical failures is one problem, not a thousand.
+        for (const reason of failures.slice(0, 5)) {
+          logger.warn(`[import] ${reason}`);
+        }
+        if (failures.length > 5) {
+          logger.warn(`[import] ... and ${failures.length - 5} more rejection(s)`);
+        }
+
+        logger.info(`[import] ${opts.table}: inserted ${inserted}, rejected ${failed} of ${rows.length}`);
+        if (failed) process.exitCode = 1;
+      } finally {
+        close();
       }
-    });
-
-    insertMany(rows);
-
-    logger.info(`[import] ${opts.table}: inserted ${inserted}, rejected ${failed} of ${rows.length}`);
-    if (failed) process.exitCode = 1;
-  } finally {
-    close();
-  }
 }
 
 if (require.main === module) {

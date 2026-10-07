@@ -102,32 +102,34 @@ LIMIT 20;
 
 -- name: transaction_percentiles
 -- p50 / p90 / p99 latency per transaction code.
--- SQLite has no percentile function, so the nearest-rank position is used.
-SELECT
-    x.txn_code                                          AS txn_code,
-    x.executions                                        AS executions,
-    x.p50_ms                                            AS p50_ms,
-    x.p90_ms                                            AS p90_ms,
-    x.p99_ms                                            AS p99_ms,
-    x.max_ms                                            AS max_ms
-FROM (
+--
+-- SQLite has no percentile function, so nearest-rank is used. Two approaches
+-- do not work here and are worth recording:
+--   * an offset of COUNT(*) inside a correlated subquery is rejected outright
+--     ("misuse of aggregate function COUNT()")
+--   * referencing a derived table's column from inside a correlated subquery
+--     resolves to "no such column" - the outer alias is not in scope there
+-- Window functions are, so the rank within each code is computed directly and
+-- the three percentiles are picked from the ranked rows.
+WITH ranked AS (
     SELECT
-        t.txn_code                                      AS txn_code,
-        COUNT(*)                                        AS executions,
-        (SELECT elapsed_ms FROM transactions t2
-          WHERE t2.txn_code = t.txn_code ORDER BY t2.elapsed_ms
-          LIMIT 1 OFFSET (COUNT(*) * 50 / 100))         AS p50_ms,
-        (SELECT elapsed_ms FROM transactions t2
-          WHERE t2.txn_code = t.txn_code ORDER BY t2.elapsed_ms
-          LIMIT 1 OFFSET (COUNT(*) * 90 / 100))         AS p90_ms,
-        (SELECT elapsed_ms FROM transactions t2
-          WHERE t2.txn_code = t.txn_code ORDER BY t2.elapsed_ms
-          LIMIT 1 OFFSET (COUNT(*) * 99 / 100))         AS p99_ms,
-        MAX(t.elapsed_ms)                               AS max_ms
-    FROM transactions t
-    GROUP BY t.txn_code
-) x
-ORDER BY x.executions DESC;
+        txn_code,
+        elapsed_ms,
+        ROW_NUMBER() OVER (PARTITION BY txn_code ORDER BY elapsed_ms) AS rn,
+        COUNT(*)     OVER (PARTITION BY txn_code)                    AS cn,
+        MAX(elapsed_ms) OVER (PARTITION BY txn_code)                 AS max_ms
+    FROM transactions
+)
+SELECT
+    txn_code,
+    MAX(cn)                                             AS executions,
+    MAX(CASE WHEN rn = MAX(1, cn * 50 / 100) THEN elapsed_ms END) AS p50_ms,
+    MAX(CASE WHEN rn = MAX(1, cn * 90 / 100) THEN elapsed_ms END) AS p90_ms,
+    MAX(CASE WHEN rn = MAX(1, cn * 99 / 100) THEN elapsed_ms END) AS p99_ms,
+    MAX(max_ms)                                         AS max_ms
+FROM ranked
+GROUP BY txn_code
+ORDER BY executions DESC;
 
 -- name: system_parameter_report
 -- Every scheduler and security parameter, grouped by its prefix.

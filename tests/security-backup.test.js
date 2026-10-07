@@ -364,3 +364,88 @@ test('verifyBackup rejects a database with no tables', () => {
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+/* --------------------------------------------------------------------------
+ * SQL query library
+ * -------------------------------------------------------------------------- */
+
+const { splitStatements } = require('../scripts/db-query.js');
+
+test('splitStatements skips a leading comment block', () => {
+  // A query file opens with a comment header. It has no runnable SQL, so it
+  // must not become a statement of its own - doing so made running a file
+  // with no --name execute the header and report "contains no statements".
+  const text = [
+    '-- My queries',
+    '-- more prose',
+    '',
+    '-- name: first',
+    'SELECT 1;',
+  ].join('\n');
+
+  const statements = splitStatements(text);
+  assert.equal(statements.length, 1, 'only the real query is a statement');
+  assert.equal(statements[0].name, 'first');
+});
+
+test('splitStatements keeps every named query', () => {
+  const text = [
+    '-- name: one',
+    'SELECT 1;',
+    '-- name: two',
+    'SELECT 2;',
+  ].join('\n');
+
+  assert.deepEqual(splitStatements(text).map((s) => s.name), ['one', 'two']);
+});
+
+test('splitStatements keeps comments attached to their query', () => {
+  // The comments are worth showing; only their absence of SQL matters.
+  const text = ['-- name: q', '-- explains itself', 'SELECT 1;'].join('\n');
+  const [statement] = splitStatements(text);
+  assert.match(statement.sql, /explains itself/);
+});
+
+test('a file of only comments yields no statements', () => {
+  assert.deepEqual(splitStatements('-- nothing here\n-- at all\n'), []);
+});
+
+test('every shipped query file parses into named statements', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const dir = path.resolve(__dirname, '..', 'sql', 'queries');
+
+  const files = fs.readdirSync(dir).filter((n) => n.endsWith('.sql'));
+  assert.ok(files.length > 0, 'there should be query files to check');
+
+  for (const file of files) {
+    const statements = splitStatements(fs.readFileSync(path.join(dir, file), 'utf8'));
+    assert.ok(statements.length > 0, `${file} produced no statements`);
+    assert.ok(statements.every((s) => s.name), `${file} has an unnamed statement`);
+  }
+});
+
+test('repair statements are single statements, not several', () => {
+  // db-query prepares one statement at a time, so two UPDATEs under one name
+  // fail with "contains more than one statement". This is the guard for that.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const file = path.resolve(__dirname, '..', 'sql', 'queries', 'integrity.sql');
+
+  for (const statement of splitStatements(fs.readFileSync(file, 'utf8'))) {
+    if (!/^repair_/.test(statement.name)) continue;
+
+    // Strip trailing comments and semicolons, then count remaining semicolons.
+    const body = statement.sql
+      .split('\n')
+      .filter((line) => !/^\s*--/.test(line))
+      .join('\n')
+      .trim()
+      .replace(/;\s*$/, '');
+
+    assert.ok(
+      !body.includes(';'),
+      `${statement.name} contains more than one statement`,
+    );
+  }
+});

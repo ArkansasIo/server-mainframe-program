@@ -163,14 +163,23 @@ UPDATE datasets
 
 -- name: repair_volume_usage
 -- Recompute every volume's used_mb from its datasets, then reclassify FULL.
+--
+-- Written as one statement: SQLite's prepare() accepts a single statement, so
+-- two UPDATEs under one name fail with "contains more than one statement".
+-- The status is derived from the freshly computed total rather than from the
+-- stored used_mb, so a single pass both corrects the usage and reclassifies.
 UPDATE volumes
-   SET used_mb = COALESCE((
-           SELECT SUM(d.bytes_used) / 1048576 FROM datasets d
-            WHERE d.volume = volumes.serial AND d.status <> 'DELETED'), 0);
-
-UPDATE volumes
-   SET status = CASE
-           WHEN used_mb >= capacity_mb AND status = 'ONLINE' THEN 'FULL'
-           WHEN used_mb <  capacity_mb AND status = 'FULL'   THEN 'ONLINE'
-           ELSE status
+   SET used_mb = (
+           SELECT COALESCE(SUM(d.bytes_used) / 1048576, 0) FROM datasets d
+            WHERE d.volume = volumes.serial AND d.status <> 'DELETED'),
+       status = CASE
+           WHEN (SELECT COALESCE(SUM(d.bytes_used) / 1048576, 0) FROM datasets d
+                  WHERE d.volume = volumes.serial AND d.status <> 'DELETED')
+                >= volumes.capacity_mb
+                AND volumes.status = 'ONLINE' THEN 'FULL'
+           WHEN (SELECT COALESCE(SUM(d.bytes_used) / 1048576, 0) FROM datasets d
+                  WHERE d.volume = volumes.serial AND d.status <> 'DELETED')
+                <  volumes.capacity_mb
+                AND volumes.status = 'FULL'   THEN 'ONLINE'
+           ELSE volumes.status
        END;

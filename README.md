@@ -24,7 +24,15 @@ server-mainframe/
 │   ├── views.sql            # reporting views
 │   └── queries/             # ad-hoc reporting SQL
 ├── spreadsheets/            # sample CSV spreadsheets
-├── scripts/                 # CLI: db init/seed, import/export spreadsheets
+├── scripts/                 # CLI: db init/seed/backup/query, launch, spreadsheets
+│   ├── launch.js            # boot: check deps, prepare db, start, open browser
+│   ├── db-init.js           # create/migrate the database
+│   ├── db-seed.js           # re-apply the sample data
+│   ├── db-backup.js         # consistent snapshot (VACUUM INTO) + verify
+│   ├── db-query.js          # run the SQL in sql/queries/
+│   ├── check-queries.js     # run every query against the schema
+│   └── export|import-spreadsheet.js
+├── docs/                    # architecture, config, api, database, terminal, sheets
 ├── public/                  # operator dashboard (static)
 ├── tests/                   # node:test suites
 ├── data/                    # runtime (gitignored)
@@ -48,6 +56,20 @@ npm run db:export                       # export all configured tables -> .xlsx
 node scripts/export-spreadsheet.js --engine csv --out data/spreadsheets
 node scripts/import-spreadsheet.js --file spreadsheets/USERS.csv --table users
 ```
+
+## Database maintenance
+
+```powershell
+npm run db:init          # create or migrate from sql/schema.sql
+npm run db:seed          # re-apply the sample data
+npm run db:backup        # consistent snapshot -> data/backups
+npm run db:backups       # list existing snapshots
+npm run db:query         # run a query, e.g. --sql "SELECT 1"
+npm run db:check-queries # run every query in sql/queries against the schema
+```
+
+`db:query` reads by default. The repair statements in `sql/queries/integrity.sql`
+modify data and require `--write`, so looking at a repair cannot apply it.
 
 ## Configuration
 

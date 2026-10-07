@@ -94,12 +94,32 @@ node scripts/import-spreadsheet.js --file spreadsheets/USERS.csv --table users
 ### Coercion
 
 Values arrive from a spreadsheet as text and are converted to match the target
-column's declared type: integers to numbers, empty cells to `NULL`, quoted
-numbers left as text.
+column's declared type: integers to numbers, quoted numbers left as text.
 
 `--no-coerce` disables that, which is the right choice when a column is declared
 `TEXT` but happens to contain digits - a dataset name like `1234` should stay a
 string rather than becoming the number 1234.
+
+### A blank cell means "use the default"
+
+A cell that is empty, or a column the file does not have at all, is **omitted
+from the INSERT** rather than written as `NULL`. The database then applies the
+column's own `DEFAULT`.
+
+This matters: binding an explicit `NULL` overrides a column's default. A row
+with a blank `password_hash` used to fail with
+`NOT NULL constraint failed: users.password_hash`, even though the column is
+declared `NOT NULL DEFAULT ''` and the default was exactly what was wanted.
+
+To deliberately store a real null, write the literal text `NULL` in the cell -
+that is the one form the importer treats as an explicit null rather than an
+absence.
+
+### Unmatched columns are reported, not fatal
+
+A header the target table does not have is warned about and skipped. A file
+with *no* recognised columns is an error, because that is almost always the
+wrong file rather than a partial one.
 
 ### `--replace` is destructive and deliberate
 

@@ -11,11 +11,16 @@
  *
  * Statements are run one at a time, in order.
  *
+ * Reads only, by default. The integrity file also carries repair statements
+ * that modify data; those require --write, so looking at a repair can never
+ * apply it by accident.
+ *
  * Usage:
  *   node scripts/db-query.js --file sql/queries/reporting.sql
  *   node scripts/db-query.js --file sql/queries/capacity.sql --name largest_datasets
  *   node scripts/db-query.js --sql "SELECT COUNT(*) AS n FROM jobs"
  *   node scripts/db-query.js --list sql/queries/integrity.sql
+ *   node scripts/db-query.js --file sql/queries/integrity.sql --name repair_counters --write
  */
 
 const fs = require('fs');
@@ -38,9 +43,25 @@ function splitStatements(text) {
   let name = null;
   let buffer = [];
 
+  /**
+   * Strip whole-line comments, so a block of prose is not mistaken for SQL.
+   *
+   * A query file opens with a comment header; without this it became a
+   * statement of its own, and running the file with no --name executed that
+   * header and reported "contains no statements" - even though the named
+   * queries below it were perfectly good.
+   */
+  const stripComments = (sql) => sql
+    .split('\n')
+    .filter((line) => !/^\s*--/.test(line))
+    .join('\n')
+    .trim();
+
   const flush = () => {
     const sql = buffer.join('\n').trim();
-    if (sql) statements.push({ name, sql });
+    // `sql` keeps the comments (they may be worth showing); `runnable` decides
+    // whether there is anything here to execute.
+    if (sql && stripComments(sql)) statements.push({ name, sql });
     buffer = [];
     name = null;
   };
@@ -59,7 +80,7 @@ function splitStatements(text) {
 }
 
 function parseArgs(argv) {
-  const opts = { file: null, sql: null, name: null, list: false, json: false };
+  const opts = { file: null, sql: null, name: null, list: false, json: false, write: false };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
       case '--file': opts.file = argv[++i]; break;
@@ -67,6 +88,10 @@ function parseArgs(argv) {
       case '--name': opts.name = argv[++i]; break;
       case '--list': opts.list = true; break;
       case '--json': opts.json = true; break;
+      // Reads are the default; a write has to be asked for explicitly, so a
+      // repair cannot be applied by someone who only meant to look.
+      case '--write':
+      case '--apply': opts.write = true; break;
       default: break;
     }
   }
@@ -74,7 +99,31 @@ function parseArgs(argv) {
 }
 
 function runStatement(db, statement, opts) {
-  const rows = db.prepare(statement.sql).all();
+  const prepared = db.prepare(statement.sql);
+
+  // A statement that returns rows is a query; one that does not is a write.
+  // `reader` is how better-sqlite3 reports which it is, and it is the only
+  // reliable way to tell without parsing the SQL.
+  if (!prepared.reader) {
+    if (!opts.write) {
+      throw new Error(
+        `${statement.name || 'statement'} is a write. Re-run with --write to apply it.`,
+      );
+    }
+
+    const info = prepared.run();
+    if (opts.json) {
+      process.stdout.write(`${JSON.stringify({
+        name: statement.name, changes: info.changes, lastInsertRowid: info.lastInsertRowid,
+      }, null, 2)}\n`);
+    } else {
+      process.stdout.write(`\n== ${statement.name || 'statement'} ==\n`);
+      process.stdout.write(`${info.changes} row(s) changed\n`);
+    }
+    return;
+  }
+
+  const rows = prepared.all();
   if (opts.json) {
     process.stdout.write(`${JSON.stringify({ name: statement.name, rows }, null, 2)}\n`);
   } else {
