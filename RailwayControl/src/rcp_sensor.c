@@ -196,6 +196,65 @@ void rw_sensor_fail(RwId sensor_id)
 }
 
 /* --------------------------------------------------------------------------
+ * Field-bus routing for microcontroller plugins  (🔌)
+ *
+ * A plugin binds to a *track*, not to a sensor id. This finds the sensor of
+ * the requested kind on that track and applies the reading through the normal
+ * path - so the plugin gets exactly the same fail-safe propagation a built-in
+ * field interface would, with no private back door.
+ *
+ * When the layout has no matching sensor the reading is still recorded as an
+ * event: silently dropping it would hide a wiring mistake.
+ * -------------------------------------------------------------------------- */
+static RwSensorKind sensor_kind_for(RcFieldSensorKind kind)
+{
+    switch (kind) {
+    case TRACK_CIRCUIT_SENSOR: return SENSOR_TRACK_CIRCUIT;
+    case AXLE_COUNTER_SENSOR:  return SENSOR_AXLE_COUNTER;
+    case TREADLE_SENSOR:       return SENSOR_TREADLE;
+    case HOT_BOX_SENSOR:       return SENSOR_HOT_BOX;
+    case LEVEL_CROSSING_SENSOR:return SENSOR_LEVEL_CROSSING;
+    }
+    return SENSOR_TRACK_CIRCUIT;
+}
+
+RwResult rw_sensor_apply_routed(const McuPlugin *plugin,
+                                const McuBinding *binding,
+                                RcFieldSensorKind kind, int value, int state)
+{
+    RailwayEngine *e = rw_engine();
+    const RwSensorKind wanted = sensor_kind_for(kind);
+    const char *plugin_name = (plugin != NULL) ? plugin->name : "(plugin)";
+    size_t i;
+
+    if (e == NULL || binding == NULL) {
+        return RW_ERR_INVALID_ARG;
+    }
+    if (binding->target == RW_ID_NONE) {
+        return RW_ERR_INVALID_ID;
+    }
+
+    for (i = 0; i < e->sensor_count; ++i) {
+        SensorState *sensor = &e->sensors[i];
+
+        if (sensor->track == binding->target && sensor->kind == wanted) {
+            return rw_sensor_apply(sensor->id, value, state);
+        }
+    }
+
+    rw_event(SEVERITY_WARNING, "PLUGIN",
+             "%s reported %s for track %u, but the layout has no such sensor",
+             plugin_name, rcp_sensor_kind_name(wanted), (unsigned)binding->target);
+    return RW_ERR_INVALID_ID;
+}
+
+/* Wrap-around safe deadline test for the millisecond clock. */
+bool elapsed_exceeded(unsigned now_ms, unsigned then_ms, unsigned limit_ms)
+{
+    return (unsigned)(now_ms - then_ms) > limit_ms;
+}
+
+/* --------------------------------------------------------------------------
  * Per-tick: age out momentary and latched inputs.
  * -------------------------------------------------------------------------- */
 void rw_sensors_tick(unsigned delta_ms)

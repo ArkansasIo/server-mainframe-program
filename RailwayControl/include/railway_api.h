@@ -103,6 +103,49 @@ extern "C"
     RwResult railway_get_train_at(int index, RwTrainInfo *info);
 
     /* ==========================================================================
+     * 4b. ROLLING STOCK  (🚃)
+     * ==========================================================================
+     *
+     * Each train is an ordered formation of cars. The train's reported length
+     * is derived from its cars, so adding or removing a car changes how much
+     * track the train occupies.
+     */
+
+    /* Number of cars in the whole system, and on one train. */
+    int railway_car_count(void);
+    int railway_train_car_count(int train_id);
+
+    /* Read one car by its id, or by its position on a train (0 = the head).
+     * Returns RW_ERR_INVALID_ID when there is no such car. */
+    RwResult railway_get_car_info(int car_id, RwCarInfo *info);
+    RwResult railway_get_car_at(int index, RwCarInfo *info);
+    RwResult railway_get_train_car(int train_id, int position, RwCarInfo *info);
+
+    /* The full formation, head first. Returns the number of cars written. */
+    int railway_list_train_cars(int train_id, RwCarInfo *out, int max);
+
+    /* Total length of a formation in metres (0 if the train has no cars). */
+    float railway_train_length_m(int train_id);
+
+    /* Attach a vehicle to a train (train_id = 0 creates a loose car).
+     * The type defaults supply the length, tare and capacity when the
+     * corresponding argument is 0 / NULL. Returns the new car id, or
+     * RW_ID_NONE when the pool or the formation is full. */
+    int railway_add_train_car(int train_id, RcpCarType type,
+                              const char *number, const char *designation,
+                              float length_m, float tare_tonnes, int capacity);
+
+    /* Detach a vehicle. The train's length is recomputed. */
+    RwResult railway_remove_train_car(int car_id);
+
+    /* Place a car in or out of service; a defective car is withdrawn. */
+    RwResult railway_set_car_status(int car_id, RcpCarStatus status);
+    RwResult railway_set_car_in_service(int car_id, bool in_service);
+
+    /* Resolve a car by its vehicle number. RW_ID_NONE when unknown. */
+    int railway_find_car(const char *number);
+
+    /* ==========================================================================
      * 5. ROUTES AND INTERLOCKING  (🔒)
      * ==========================================================================
      *

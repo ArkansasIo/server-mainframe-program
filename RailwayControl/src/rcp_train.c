@@ -61,7 +61,12 @@ void rw_trains_init(void)
         if (train->max_speed_kph <= 0.0f) {
             train->max_speed_kph = 100.0f;
         }
-        if (train->length_m == 0) {
+        /* The length comes from the formation when the train has one. The
+         * carriages*23+20 fallback only applies to a train with no cars
+         * modelled - see rcp_car.c, which owns the derived value. */
+        if (rw_cars_of_train_count(train->id) > 0) {
+            rw_train_recompute_length(train->id);
+        } else if (train->length_m == 0) {
             train->length_m = (unsigned)(train->carriages * 23 + 20);
         }
 

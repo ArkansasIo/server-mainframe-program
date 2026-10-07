@@ -215,4 +215,25 @@ function createSilentLogger() {
   };
 }
 
-module.exports = { Logger, LEVELS, redact, createSilentLogger, formatTimestamp };
+/**
+ * A ready-to-use module-level logger for the CLI scripts.
+ *
+ * scripts/*.js do `const logger = require('../src/core/logger')` and then
+ * call logger.info(...) directly, so the module itself has to behave like a
+ * logger, not just export the class. Console-only (no file) and driven by
+ * MF_LOG_LEVEL so a quiet run is possible.
+ */
+const defaultLogger = new Logger({
+  level: process.env.MF_LOG_LEVEL || 'info',
+  console: true,
+  directory: null,
+});
+
+// Export the logger *instance* as the module, while attaching the named
+// exports so `require('./logger').Logger` still works.
+module.exports = defaultLogger;
+module.exports.Logger = Logger;
+module.exports.LEVELS = LEVELS;
+module.exports.redact = redact;
+module.exports.createSilentLogger = createSilentLogger;
+module.exports.formatTimestamp = formatTimestamp;

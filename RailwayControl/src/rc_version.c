@@ -28,7 +28,7 @@ const RcTeamMember *rc_team(void)
 /* --------------------------------------------------------------------------
  * Department credits
  *
- * Stephen is credited in every department below. This table is the single
+ * ArkansasIo is credited in every department below. This table is the single
  * source of truth for the About dialogue - the title screen renders the same
  * entries, so a new department is added once, here.
  * -------------------------------------------------------------------------- */
@@ -176,7 +176,7 @@ const char *rc_credits_text(void)
                 "  %-18s : %s\n", member->role, member->name);
         }
 
-        /* Department credits. Stephen is the author of record for every
+        /* Department credits. ArkansasIo is the author of record for every
          * department this program is organised into. */
         {
             const RcCredit *credit;

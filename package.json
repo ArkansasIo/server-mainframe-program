@@ -15,7 +15,7 @@
     "db:seed": "node scripts/db-seed.js",
     "db:export": "node scripts/export-spreadsheet.js",
     "db:import": "node scripts/import-spreadsheet.js",
-    "test": "node --test tests/"
+    "test": "node --test \"tests/*.test.js\""
   },
   "keywords": [
     "mainframe",
@@ -28,7 +28,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^11.3.0"
+    "better-sqlite3": "^12.11.1"
   },
   "optionalDependencies": {
     "exceljs": "^4.4.0"

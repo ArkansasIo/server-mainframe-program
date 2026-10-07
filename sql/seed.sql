@@ -27,13 +27,17 @@ INSERT OR IGNORE INTO volumes (serial, device_type, capacity_mb, used_mb, status
 INSERT OR IGNORE INTO datasets
     (name, dsorg, recfm, lrecl, blksize, volume, owner_user_id, record_count, bytes_used, status)
 VALUES
-    ('MF1.PROD.CUSTOMER.MASTER', 'VSAM', 'FB', 200, 27920, 'MFVOL1', 1, 4, 800,  'AVAILABLE'),
-    ('MF1.PROD.ACCOUNT.LEDGER',  'VSAM', 'FB', 180, 27920, 'MFVOL2', 1, 3, 540,  'AVAILABLE'),
-    ('MF1.PROD.TRANSACTION.LOG', 'PS',   'VB', 256, 27920, 'MFVOL3', 2, 3, 768,  'AVAILABLE'),
-    ('MF1.SYS.PARMLIB',          'PDS',  'FB',  80, 27920, 'MFVOL1', 1, 2, 160,  'AVAILABLE'),
-    ('MF1.TEST.SAMPLE.DATA',     'PS',   'FB',  80, 27920, 'MFVOL2', 3, 2, 160,  'AVAILABLE'),
-    ('MF1.ARCHIVE.2024',         'PS',   'FB', 133, 27920, 'MFTAPE1',1, 1, 133,  'MIGRATED');
+    ('MF1.PROD.CUSTOMER.MASTER', 'VSAM', 'FB', 200, 27920, 'MFVOL1', 1, 0, 0,  'AVAILABLE'),
+    ('MF1.PROD.ACCOUNT.LEDGER',  'VSAM', 'FB', 180, 27920, 'MFVOL2', 1, 0, 0,  'AVAILABLE'),
+    ('MF1.PROD.TRANSACTION.LOG', 'PS',   'VB', 256, 27920, 'MFVOL3', 2, 0, 0,  'AVAILABLE'),
+    ('MF1.SYS.PARMLIB',          'PDS',  'FB',  80, 27920, 'MFVOL1', 1, 0, 0,  'AVAILABLE'),
+    ('MF1.TEST.SAMPLE.DATA',     'PS',   'FB',  80, 27920, 'MFVOL2', 3, 0, 0,  'AVAILABLE'),
+    ('MF1.ARCHIVE.2024',         'PS',   'FB', 133, 27920, 'MFTAPE1',1, 0, 0,  'MIGRATED');
 
+-- The record_count / bytes_used columns are intentionally seeded as 0 rather
+-- than hardcoded: the counters are derived data (see sql/triggers.sql) and are
+-- reconciled from dataset_records by the final block below. Hardcoding them
+-- would mean two sources of truth that silently disagree after a re-seed.
 INSERT OR IGNORE INTO dataset_records (dataset_id, sequence, payload) VALUES
     (1, 1, 'CUST0001|ACME INDUSTRIES|ACTIVE|CREDIT-LIMIT-250000'),
     (1, 2, 'CUST0002|GLOBEX CORPORATION|ACTIVE|CREDIT-LIMIT-1000000'),
@@ -84,3 +88,27 @@ INSERT OR IGNORE INTO system_parameters (param_key, param_value, description) VA
     ('SMF.RECORDING',       'ON',   'System management facility recording'),
     ('STORAGE.DEFAULT.VOL', 'MFVOL1','Default volume for new datasets'),
     ('TCP.BANNER',          'WELCOME TO MAINFRAME-1 - LOGON REQUIRED', 'Terminal banner');
+
+-- ---------------------------------------------------------------------------
+-- Reconcile derived counters.
+--
+-- dataset_records was populated above, but the triggers that keep
+-- datasets.record_count / bytes_used in step only exist from revision 005.
+-- On a fresh database the seed (002) runs before them, so the counters are
+-- recomputed here from the records themselves. This is idempotent: running
+-- the seed again recomputes the same values.
+-- ---------------------------------------------------------------------------
+UPDATE datasets
+   SET record_count = COALESCE((
+           SELECT COUNT(*) FROM dataset_records r
+            WHERE r.dataset_id = datasets.dataset_id), 0),
+       bytes_used = COALESCE((
+           SELECT SUM(LENGTH(r.payload)) FROM dataset_records r
+            WHERE r.dataset_id = datasets.dataset_id), 0);
+
+-- and the volumes, from the datasets placed on them (in MiB, as the
+-- volume-usage trigger does).
+UPDATE volumes
+   SET used_mb = COALESCE((
+           SELECT SUM(d.bytes_used) / 1048576 FROM datasets d
+            WHERE d.volume = volumes.serial AND d.status <> 'DELETED'), 0);

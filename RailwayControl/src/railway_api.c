@@ -770,6 +770,180 @@ RwResult railway_get_train_at(int index, RwTrainInfo *info)
 }
 
 /* ==========================================================================
+ * Rolling stock  (🚃)
+ * ========================================================================== */
+int railway_car_count(void)
+{
+    return (int)g_engine.car_count;
+}
+
+int railway_train_car_count(int train_id)
+{
+    return rw_cars_of_train_count((RwId)train_id);
+}
+
+RwResult railway_get_car_info(int car_id, RwCarInfo *info)
+{
+    if (info == NULL)
+    {
+        return RW_ERR_INVALID_ARG;
+    }
+    if (rw_car_by_id((RwId)car_id) == NULL)
+    {
+        return RW_ERR_INVALID_ID;
+    }
+    lock_enter();
+    rw_car_to_info((RwId)car_id, info);
+    lock_leave();
+    return RW_OK;
+}
+
+RwResult railway_get_car_at(int index, RwCarInfo *info)
+{
+    if (info == NULL)
+    {
+        return RW_ERR_INVALID_ARG;
+    }
+    if (index < 0 || (size_t)index >= g_engine.car_count)
+    {
+        return RW_ERR_INVALID_ID;
+    }
+    lock_enter();
+    rw_car_to_info(g_engine.cars[index].id, info);
+    lock_leave();
+    return RW_OK;
+}
+
+RwResult railway_get_train_car(int train_id, int position, RwCarInfo *info)
+{
+    RwId car_id;
+    RwResult result;
+
+    if (info == NULL)
+    {
+        return RW_ERR_INVALID_ARG;
+    }
+    car_id = rw_car_find_on_train((RwId)train_id, position);
+    if (car_id == RW_ID_NONE)
+    {
+        return RW_ERR_INVALID_ID;
+    }
+    lock_enter();
+    rw_car_to_info(car_id, info);
+    lock_leave();
+    result = RW_OK;
+    return result;
+}
+
+int railway_list_train_cars(int train_id, RwCarInfo *out, int max)
+{
+    int written;
+
+    if (out == NULL || max <= 0)
+    {
+        return 0;
+    }
+    lock_enter();
+    written = rw_cars_of_train((RwId)train_id, out, max);
+    lock_leave();
+    return written;
+}
+
+float railway_train_length_m(int train_id)
+{
+    float length;
+
+    lock_enter();
+    length = rw_train_formation_length((RwId)train_id);
+    lock_leave();
+    return length;
+}
+
+int railway_add_train_car(int train_id, RcpCarType type,
+                          const char *number, const char *designation,
+                          float length_m, float tare_tonnes, int capacity)
+{
+    RwId car_id;
+
+    if (!g_engine.initialized)
+    {
+        return (int)RW_ID_NONE;
+    }
+    lock_enter();
+    car_id = rw_car_add((RwId)train_id, type, number, designation,
+                        length_m, tare_tonnes, capacity);
+    if (car_id != RW_ID_NONE)
+    {
+        rw_event(SEVERITY_INFO, "STOCK",
+                 "Car %s (%s) attached to train %u",
+                 number != NULL ? number : "(new)",
+                 rcp_car_type_code(type), (unsigned)train_id);
+    }
+    rw_bump_revision();
+    lock_leave();
+    return (int)car_id;
+}
+
+RwResult railway_remove_train_car(int car_id)
+{
+    RwResult result;
+
+    lock_enter();
+    result = rw_car_remove((RwId)car_id);
+    rw_bump_revision();
+    lock_leave();
+    return result;
+}
+
+RwResult railway_set_car_status(int car_id, RcpCarStatus status)
+{
+    CarStateInternal *car = rw_car_by_id((RwId)car_id);
+
+    if (car == NULL)
+    {
+        return RW_ERR_INVALID_ID;
+    }
+    lock_enter();
+    car->status = status;
+    if (status == CAR_STATUS_OUT_OF_SERVICE || status == CAR_STATUS_DEFECTIVE)
+    {
+        car->in_service = false;
+    }
+    rw_event(status == CAR_STATUS_DEFECTIVE ? SEVERITY_WARNING : SEVERITY_INFO,
+             "STOCK", "Car %s status set to %s",
+             car->number, rcp_car_status_name(status));
+    rw_bump_revision();
+    lock_leave();
+    return RW_OK;
+}
+
+RwResult railway_set_car_in_service(int car_id, bool in_service)
+{
+    CarStateInternal *car = rw_car_by_id((RwId)car_id);
+
+    if (car == NULL)
+    {
+        return RW_ERR_INVALID_ID;
+    }
+    lock_enter();
+    car->in_service = in_service;
+    if (!in_service && car->status == CAR_STATUS_OK)
+    {
+        car->status = CAR_STATUS_OUT_OF_SERVICE;
+    }
+    rw_event(SEVERITY_INFO, "STOCK", "Car %s %s service",
+             car->number, in_service ? "returned to" : "withdrawn from");
+    rw_bump_revision();
+    lock_leave();
+    return RW_OK;
+}
+
+int railway_find_car(const char *number)
+{
+    return (int)rw_car_find(number);
+}
+
+/* ==========================================================================
  * Routes  (🔒)
  * ========================================================================== */
 RwResult railway_request_route(int route_id)

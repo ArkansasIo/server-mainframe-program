@@ -178,6 +178,130 @@ static void route_step(RouteStateInternal *route, RwId track, RwId point, Switch
 }
 
 /* --------------------------------------------------------------------------
+ * Rolling stock builders
+ *
+ * Every train in the demonstration fleet gets its known formation: a traction
+ * unit at the head, the vehicles behind it, and (on the freight) a brake van
+ * at the tail. This is the data the operator sees on the train detail panel,
+ * and it is what determines each train's length.
+ * -------------------------------------------------------------------------- */
+
+/* Append a single car to a train, letting rcp_car.c supply the per-type
+ * defaults for anything not given here. */
+static void add_car(RailwayEngine *e, RwId train_id, RcpCarType type,
+                    const char *number, const char *designation)
+{
+    (void)e;
+    rw_car_add(train_id, type, number, designation, 0.0f, 0.0f, -1);
+}
+
+/* Give a car a load, so the fleet is not uniformly empty. */
+static void load_car(const char *number, float percent, bool occupied)
+{
+    RwId car_id = rw_car_find(number);
+    CarStateInternal *car = rw_car_by_id(car_id);
+
+    if (car != NULL)
+    {
+        car->load_percent = percent;
+        car->occupied = occupied;
+    }
+}
+
+/*
+ * The known formations.
+ *
+ *   1A34  Up express       - 1 loco + 7 passenger + 1 dining  (9 vehicles)
+ *   2C58  Down stopping    - 1 loco + 5 passenger             (6 vehicles)
+ *   4E71  Coal empties     - 2 loco (banking) + 14 hopper + brake van
+ *   6T22  Track machine    - 1 loco + 2 engineering vehicles
+ *   0Z99  Light engine     - 1 loco only
+ */
+static void build_fleet_cars(RailwayEngine *e)
+{
+    RwId train;
+
+    if (e->train_count < 5)
+    {
+        return;
+    }
+
+    /* --- 1A34: the up express, a 9-car passenger formation. --------------- */
+    train = 1;
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "43021", "Class 43 power car");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "41102", "Trailer first");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "41103", "Trailer first");
+    add_car(e, train, CAR_CLASS_DINING,      "40701", "Buffet restaurant");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "42110", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "42111", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "42112", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "42113", "Trailer standard");
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "43022", "Class 43 power car (rear)");
+    load_car("41102", 62.0f, true);
+    load_car("41103", 48.0f, true);
+    load_car("40701", 35.0f, true);
+    load_car("42110", 71.0f, true);
+    load_car("42111", 66.0f, true);
+    load_car("42112", 54.0f, true);
+    load_car("42113", 29.0f, true);
+
+    /* --- 2C58: the down stopping service, 6 cars. ------------------------- */
+    train = 2;
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "15801", "Class 158 power car");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "15811", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "15812", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "15813", "Trailer standard");
+    add_car(e, train, CAR_CLASS_PASSENGER,   "15814", "Trailer standard");
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "15802", "Class 158 power car (rear)");
+    load_car("15811", 44.0f, true);
+    load_car("15812", 58.0f, true);
+    load_car("15813", 33.0f, true);
+    load_car("15814", 19.0f, true);
+
+    /* --- 4E71: coal empties - running empty back to the colliery. -------- */
+    train = 3;
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "66018", "Class 66 traction unit");
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "66019", "Class 66 banking unit");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3101", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3102", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3103", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3104", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3105", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3106", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3107", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3108", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3109", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3110", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3111", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3112", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3113", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_HOPPER,      "HOP3114", "HAA coal hopper");
+    add_car(e, train, CAR_CLASS_BRAKE_VAN,   "BV9001", "Guards brake van");
+
+    /* --- 6T22: track machine on the siding. ------------------------------- */
+    train = 4;
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "31601", "Class 31 traction unit");
+    add_car(e, train, CAR_CLASS_ENGINEERING, "DR77001", "Ballast tamper");
+    add_car(e, train, CAR_CLASS_ENGINEERING, "DR77002", "Stoneblower");
+
+    /* --- 0Z99: light engine, a single traction unit. ---------------------- */
+    train = 5;
+    add_car(e, train, CAR_CLASS_LOCOMOTIVE,  "57009", "Class 57 light engine");
+
+    /* A spare vehicle in the yard, not attached to any train. */
+    add_car(e, RW_ID_NONE, CAR_CLASS_FREIGHT_FLAT, "FLT4401", "Spare flat wagon");
+
+    /* Recompute every train's derived length from the formations just built. */
+    {
+        size_t t;
+        for (t = 0; t < e->train_count; ++t)
+        {
+            rw_train_recompute_length(e->trains[t].id);
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------
  * Track ids, named for readability below. These match the order in which the
  * tracks are added.
  * -------------------------------------------------------------------------- */
@@ -208,6 +332,10 @@ RwResult rw_layout_build_default(RailwayEngine *e)
     {
         return RW_ERR_INVALID_ARG;
     }
+
+    /* The rolling stock pool is engine-wide; start it empty before any
+     * formation is built. */
+    rw_cars_init();
 
     /* -------- UP MAIN (eastbound, top half of the panel) ---------------- */
     add_track(e, "T1 UP MAIN W", 0.72f, 0.02f, 0.72f, 0.22f, 100, 480.0f);
@@ -301,6 +429,9 @@ RwResult rw_layout_build_default(RailwayEngine *e)
         e->trains[3].position_m = 40.0f;
         e->trains[4].position_m = 300.0f;
     }
+
+    /* -------- ROLLING STOCK: give every train its known formation --------- */
+    build_fleet_cars(e);
 
     /* -------- ROUTES ----------------------------------------------------
      * Each route names its entry and exit signal and lists the tracks and

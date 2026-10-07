@@ -102,7 +102,50 @@ TEST_OBJ := $(patsubst $(TESTDIR)/%.c,$(OBJDIR)/tests/%.o,$(TEST_SRC))
 
 TARGET   := $(BUILD)/rcp$(EXE)
 TESTBIN  := $(BUILD)/rcp-tests$(EXE)
+GUITARGET := $(BUILD)/rcp-gui$(EXE)
 INCLUDES := -I$(INCDIR)
+
+# ---------------------------------------------------------------------------
+# GUI (Win32 dispatch console)
+#
+# A separate executable from the console build. It shares every engine object
+# and adds the window, so there is one implementation of the railway and two
+# front ends over it. Only meaningful on Windows.
+# ---------------------------------------------------------------------------
+ifeq ($(OS),Windows_NT)
+GUI_SRC  := \
+    $(SRCDIR)/win32_entry.c \
+    $(SRCDIR)/win32_main.c \
+    $(SRCDIR)/win32_panel.c \
+    $(SRCDIR)/win32_status.c \
+    $(SRCDIR)/win32_terminal.c \
+    $(SRCDIR)/win32_actions.c
+
+GUI_OBJ  := $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(GUI_SRC))
+
+# -mwindows sets the WINDOWS subsystem so no console window appears, and
+# -municode selects the wWinMain entry point.
+GUI_LDFLAGS := $(LDFLAGS) -mwindows -municode
+GUI_LDLIBS  := $(LDLIBS) -lgdi32 -luser32 -lcomdlg32 -lshell32
+
+# Note: main.o is deliberately excluded - the GUI has its own entry point in
+# win32_entry.c, and linking both would give two WinMain/main definitions.
+$(GUITARGET): $(GUI_OBJ) $(LIB_OBJ)
+	$(CC) $(CFLAGS) $(GUI_OBJ) $(LIB_OBJ) -o $@ $(GUI_LDFLAGS) $(GUI_LDLIBS)
+
+.PHONY: gui
+
+gui: $(GUITARGET)
+	@echo "Built $(GUITARGET)"
+
+else
+
+.PHONY: gui
+
+gui:
+	@echo "The GUI is Win32 only; build targets on this platform are rcp and rcp-tests."
+
+endif
 
 # ---------------------------------------------------------------------------
 # Targets
@@ -143,6 +186,7 @@ clean:
 help:
 	@echo "RailControl targets:"
 	@echo "  all    build $(TARGET)"
+	@echo "  gui    build $(GUITARGET) (Win32 dispatch console)"
 	@echo "  run    interactive control console"
 	@echo "  sim    60 second headless simulation"
 	@echo "  demo   run the batch example"

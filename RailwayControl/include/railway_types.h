@@ -120,6 +120,8 @@ typedef enum
 #define RW_MAX_TRACKS 64
 #define RW_MAX_ROUTES 48
 #define RW_MAX_TRAINS 24
+#define RW_MAX_CARS 32
+#define RW_MAX_CARS_PER_TRAIN 16
 #define RW_MAX_SENSORS 128
 #define RW_MAX_EVENTS  2048
 #define RW_EVENT_RETENTION_MAX 2048
@@ -195,6 +197,69 @@ typedef struct
     float longitude;
     unsigned delay_seconds;
 } RwTrainInfo;
+
+/* --------------------------------------------------------------------------
+ * Rolling stock - the individual vehicles that make up a train.
+ *
+ * A train is an ordered formation of cars: a traction unit at the head and
+ * one or more vehicles behind it. The car list is what actually determines a
+ * train's length, and therefore how many track sections it occupies - a
+ * 9-car set straddles more track circuits than a 2-car unit, which is the
+ * entire reason a signaller cares about the formation.
+ * -------------------------------------------------------------------------- */
+
+/* What kind of vehicle a car is. */
+typedef enum
+{
+    CAR_CLASS_LOCOMOTIVE = 0,  /* traction unit - at the head (or both ends) */
+    CAR_CLASS_PASSENGER,       /* passenger saloon / multiple unit vehicle */
+    CAR_CLASS_FREIGHT_BOX,     /* covered box wagon */
+    CAR_CLASS_FREIGHT_FLAT,    /* flat wagon - containers, timber, steel */
+    CAR_CLASS_TANK,            /* tank wagon - liquids and gases */
+    CAR_CLASS_HOPPER,          /* bulk hopper - coal, aggregate, ballast */
+    CAR_CLASS_BRAKE_VAN,       /* guards van / brake van at the tail */
+    CAR_CLASS_DINING,          /* catering vehicle */
+    CAR_CLASS_SLEEPER,         /* sleeping car */
+    CAR_CLASS_ENGINEERING      /* works vehicle - crane, tamper, etc. */
+} RcpCarType;
+
+/* A car's mechanical disposition - what a depot might report. */
+typedef enum
+{
+    CAR_STATUS_OK = 0,
+    CAR_STATUS_DEFECTIVE,
+    CAR_STATUS_SHUNTING,
+    CAR_STATUS_OUT_OF_SERVICE,
+    CAR_STATUS_LOCKED
+} RcpCarStatus;
+
+/* How a car is coupled to the formation. */
+typedef enum
+{
+    CAR_COUPLING_INTERNAL = 0, /* coupled to the car ahead */
+    CAR_COUPLING_LEAD,         /* nothing ahead - the head of the train */
+    CAR_COUPLING_TAIL,         /* nothing behind - the tail of the train */
+    CAR_COUPLING_LOOSE         /* detached / parked */
+} RcpCarCoupling;
+
+/* Read-only view of one car, handed out by the API. */
+typedef struct
+{
+    RwId          id;                         /* car id, 1-based, unique globally */
+    RwId          train;                      /* owning train, RW_ID_NONE if loose */
+    int           position;                   /* 0 = head, counting back */
+    char          number[RW_MAX_NAME];        /* vehicle number, e.g. "10234" */
+    char          designation[RW_MAX_NAME];   /* e.g. "Class 220 Car" */
+    RcpCarType    type;
+    RcpCarStatus  status;
+    RcpCarCoupling coupling;
+    float         length_m;                   /* over-vehicles length */
+    float         tare_tonnes;                /* unladen weight */
+    int           capacity;                   /* seats, or tonnes of freight */
+    float         load_percent;               /* how full, 0..100 */
+    bool          occupied;                   /* passengers/freight on board */
+    bool          in_service;
+} RwCarInfo;
 
 typedef struct
 {
@@ -306,5 +371,13 @@ const char *rcp_sensor_state_name(RwSensorState state);
 const char *rcp_train_class_name(int cls);
 char        rcp_aspect_char(SignalState aspect);
 const char *rw_result_string_short(int terminal_status);
+
+/* Rolling stock lookups and labels. Every front end renders cars the same way. */
+RwId rw_car_find(const char *number);              /* by vehicle number */
+RwId rw_car_find_on_train(RwId train_id, int position);
+const char *rcp_car_type_name(RcpCarType type);
+const char *rcp_car_status_name(RcpCarStatus status);
+const char *rcp_car_coupling_name(RcpCarCoupling coupling);
+const char *rcp_car_type_code(RcpCarType type);      /* short code, e.g. "LOCO" */
 
 #endif /* RAILWAY_TYPES_H */

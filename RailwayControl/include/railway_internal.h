@@ -7,6 +7,7 @@
 
 #include "railway_types.h"
 #include "interlocking.h"
+#include "mcu_plugin.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -111,6 +112,25 @@ typedef enum {
     TRAIN_CLASS_LIGHT_ENGINE
 } TrainClass;
 
+/* One vehicle. Cars live in a single engine-wide pool and reference their
+ * train; a formation is rebuilt by ordering the pool by train + position. */
+typedef struct {
+    RwId          id;
+    RwId          train;                      /* owning train, RW_ID_NONE if loose */
+    int           position;                   /* 0 = head, counting back */
+    char          number[RW_MAX_NAME];        /* vehicle number */
+    char          designation[RW_MAX_NAME];   /* free text description */
+    RcpCarType    type;
+    RcpCarStatus  status;
+    RcpCarCoupling coupling;
+    float         length_m;
+    float         tare_tonnes;
+    int           capacity;
+    float         load_percent;
+    bool          occupied;
+    bool          in_service;
+} CarStateInternal;
+
 typedef struct {
     RwId        id;
     char        headcode[RW_MAX_NAME];
@@ -178,6 +198,9 @@ typedef struct
     size_t sensor_count;
     TrainStateInternal trains[RW_MAX_TRAINS];
     size_t train_count;
+    CarStateInternal cars[RW_MAX_CARS];
+    size_t car_count;
+    RwId next_car_id;
     EventRecord events[RW_MAX_EVENTS];
     size_t event_count;
     RwId next_event_id;
@@ -242,6 +265,23 @@ void rw_trains_init(void);
 void rw_trains_tick(unsigned delta_ms);
 void rw_train_apply_emergency(TrainStateInternal *train);
 
+/* Rolling stock  (🚃) - the cars that make up each formation. */
+void  rw_cars_init(void);
+RwId  rw_car_add(RwId train_id, RcpCarType type, const char *number,
+                 const char *designation, float length_m,
+                 float tare_tonnes, int capacity);
+RwResult rw_car_remove(RwId car_id);
+CarStateInternal *rw_car_by_id(RwId car_id);
+void  rw_car_to_info(RwId car_id, RwCarInfo *info);
+int   rw_cars_of_train(RwId train_id, RwCarInfo *out, int max);
+int   rw_cars_of_train_count(RwId train_id);
+float rw_train_formation_length(RwId train_id);
+RwResult rw_train_recompute_length(RwId train_id);
+const char *rw_car_default_designation(RcpCarType type);
+float rw_car_default_length(RcpCarType type);
+float rw_car_default_tare(RcpCarType type);
+int rw_car_default_capacity(RcpCarType type);
+
 /* Signal-internal helpers used by the train controller. */
 bool rw_signal_visible_to_train(const RailwayEngine *engine, RwId signal_id,
                                 const TrainStateInternal *train,
@@ -275,6 +315,30 @@ void rw_sensors_init(void);
 RwResult rw_sensor_apply(RwId sensor_id, int value, int state);
 void rw_sensors_tick(unsigned delta_ms);
 void rw_sensor_fail(RwId sensor_id);
+
+/* Rolling stock / field-bus glue  (🔌).
+ *
+ * A microcontroller plugin reports a reading for a *track*, not for a sensor
+ * id it happens to know. These helpers map a plugin binding onto whatever
+ * sensor the layout put on that track, so the plugin never has to be told
+ * the sensor numbering - and a layout change does not break a board. */
+typedef enum {
+    TRACK_CIRCUIT_SENSOR = 0,
+    AXLE_COUNTER_SENSOR,
+    TREADLE_SENSOR,
+    HOT_BOX_SENSOR,
+    LEVEL_CROSSING_SENSOR
+} RcFieldSensorKind;
+
+/* The plugin types are needed by the signature below. mcu_plugin.h is
+ * self-contained (it only depends on railway_types.h), so it can be included
+ * here without a cycle. */
+RwResult rw_sensor_apply_routed(const McuPlugin *plugin,
+                                const McuBinding *binding,
+                                RcFieldSensorKind kind, int value, int state);
+
+/* Wrap-around safe "has this deadline passed?" for the millisecond clock. */
+bool elapsed_exceeded(unsigned now_ms, unsigned then_ms, unsigned limit_ms);
 
 /* Layout construction (the demonstration railway). */
 RwResult rw_layout_build_default(RailwayEngine *engine);

@@ -50,7 +50,7 @@
 /* --------------------------------------------------------------------------
  * Authorship
  *
- * Stephen is the author of record for RailControl and is credited in every
+ * ArkansasIo is the author of record for RailControl and is credited in every
  * department the program is organised into. The department list below is the
  * same list the About dialogue and the title screen print, so the credits
  * cannot drift away from the code: change the macro, change the credit.
@@ -64,8 +64,8 @@
  * be organisationally separate from the developer. Crediting the author there
  * would be a false claim, so it stays UNASSIGNED.
  * -------------------------------------------------------------------------- */
-#define RC_AUTHOR_NAME       "Stephen"
-#define RC_AUTHOR_HANDLE     "@Stephen"
+#define RC_AUTHOR_NAME       "ArkansasIo"
+#define RC_AUTHOR_HANDLE     "@ArkansasIo"
 
 /* Historic aliases kept so existing code and build scripts keep working. */
 #define RC_DEVELOPER_NAME    RC_AUTHOR_NAME
@@ -85,7 +85,7 @@
 /* --------------------------------------------------------------------------
  * Department credits
  *
- * Every department Stephen is credited in. These strings are printed verbatim
+ * Every department ArkansasIo is credited in. These strings are printed verbatim
  * by rc_title_screen() and rc_credits_text().
  * -------------------------------------------------------------------------- */
 #define RC_DEPT_ARCHITECTURE   "System architecture"
