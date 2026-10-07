@@ -8,6 +8,7 @@
 #include "railway_types.h"
 #include "interlocking.h"
 #include "mcu_plugin.h"
+#include "naming.h"
 
 #include <stdbool.h>
 #include <stddef.h>

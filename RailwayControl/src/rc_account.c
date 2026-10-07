@@ -459,6 +459,67 @@ const char *rc_password_validate(const char *password)
     return NULL;
 }
 
+/* --------------------------------------------------------------------------
+ * Registration-time validation
+ * -------------------------------------------------------------------------- */
+const char *rc_username_validate(const char *username)
+{
+    size_t length;
+    size_t i;
+
+    if (username == NULL || username[0] == '\0')
+    {
+        return "Userid must not be empty";
+    }
+
+    length = strlen(username);
+    if (length < 3)
+    {
+        return "Userid must be at least 3 characters";
+    }
+    if (length > RC_MAX_USERNAME)
+    {
+        return "Userid is too long";
+    }
+
+    /* Must start with a letter. A leading digit would be confusing at a
+     * console where numeric replies also select a menu item. */
+    if (!isalpha((unsigned char)username[0]))
+    {
+        return "Userid must start with a letter";
+    }
+
+    for (i = 0; i < length; ++i)
+    {
+        const unsigned char c = (unsigned char)username[i];
+        if (!isalnum(c) && c != '.' && c != '_' && c != '-')
+        {
+            return "Userid may contain only letters, digits, dot, underscore and hyphen";
+        }
+    }
+    return NULL;
+}
+
+const char *rc_password_confirm_validate(const char *password,
+                                         const char *confirmation)
+{
+    const char *reason = rc_password_validate(password);
+
+    if (reason != NULL)
+    {
+        return reason;
+    }
+    if (confirmation == NULL)
+    {
+        return NULL;
+    }
+    if (strcmp(password, confirmation) != 0)
+    {
+        return "Passwords do not match";
+    }
+    return NULL;
+}
+
 void rc_account_hash_password(RcAccount *account, const char *password)
 {
     int slot;

@@ -71,6 +71,7 @@ CORE_SRC := \
     $(SRCDIR)/rcp_interlock.c \
     $(SRCDIR)/rcp_layout.c \
     $(SRCDIR)/rcp_names.c \
+    $(SRCDIR)/naming.c \
     $(SRCDIR)/rcp_persist.c \
     $(SRCDIR)/rcp_point.c \
     $(SRCDIR)/rcp_route.c \
@@ -148,6 +149,24 @@ gui:
 endif
 
 # ---------------------------------------------------------------------------
+# Tools
+#
+# Small diagnostics that link the engine but are not part of the product.
+# They exist so a layout or policy change can be checked before it ships.
+# ---------------------------------------------------------------------------
+NAMESTOOL := $(BUILD)/names_tool$(EXE)
+
+$(NAMESTOOL): tools/names_tool.c $(LIB_OBJ)
+	@$(call MKDIRP,$(BUILD))
+	$(CC) $(CFLAGS) $(INCLUDES) tools/names_tool.c $(LIB_OBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: namestool
+
+namestool: $(NAMESTOOL)
+	@echo "Built $(NAMESTOOL)"
+	$(NAMESTOOL)
+
+# ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
 .PHONY: all run sim test clean help dirs
@@ -185,10 +204,11 @@ clean:
 
 help:
 	@echo "RailControl targets:"
-	@echo "  all    build $(TARGET)"
-	@echo "  gui    build $(GUITARGET) (Win32 dispatch console)"
-	@echo "  run    interactive control console"
-	@echo "  sim    60 second headless simulation"
-	@echo "  demo   run the batch example"
-	@echo "  test   build and run the unit tests"
-	@echo "  clean  remove $(BUILD)/"
+	@echo "  all       build $(TARGET)"
+	@echo "  gui       build $(GUITARGET) (Win32 dispatch console)"
+	@echo "  run       interactive control console"
+	@echo "  sim       60 second headless simulation"
+	@echo "  demo      run the batch example"
+	@echo "  test      build and run the unit tests"
+	@echo "  namestool build and run the naming diagnostics"
+	@echo "  clean     remove $(BUILD)/"

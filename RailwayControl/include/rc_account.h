@@ -272,6 +272,31 @@ extern "C"
     const char *rc_password_validate(const char *password);
 
     /* --------------------------------------------------------------------------
+     * Registration-time validation
+     *
+     * Account creation is the one place an operator supplies both the username
+     * and the password by hand, so it is the one place both need checking
+     * before anything is written:
+     *
+     *   username   must satisfy a syntax rule, not just be non-empty
+     *   password   must satisfy the policy AND be typed twice
+     *
+     * Keeping these here rather than in a front end means the console, the GUI
+     * and any future web form all enforce the same rules.
+     * -------------------------------------------------------------------------- */
+
+    /* Username syntax: 3..RC_MAX_USERNAME characters, must start with a
+     * letter, then letters, digits, dot, underscore or hyphen.
+     * Returns NULL when acceptable, otherwise a static reason string. */
+    const char *rc_username_validate(const char *username);
+
+    /* Check a password and its confirmation match. `confirmation` may be NULL
+     * to skip the match check (used where a caller has only one field).
+     * Returns NULL when acceptable, otherwise a static reason string. */
+    const char *rc_password_confirm_validate(const char *password,
+                                             const char *confirmation);
+
+    /* --------------------------------------------------------------------------
      * Authentication log  (separate from the operational event log)
      * -------------------------------------------------------------------------- */
     typedef enum

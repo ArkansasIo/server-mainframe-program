@@ -142,6 +142,9 @@ const char *rw_safety_name(SystemState state)
  * -------------------------------------------------------------------------- */
 RwId rw_signal_find(const char *name)
 {
+    /* Exact match first, then the resolver. The engine's own arrays are the
+     * authority; the resolver adds case-insensitivity, short names and
+     * aliases on top without ever overriding an exact hit. */
     RailwayEngine *e = rw_engine();
     size_t i;
 
@@ -156,7 +159,7 @@ RwId rw_signal_find(const char *name)
             return e->signals[i].id;
         }
     }
-    return RW_ID_NONE;
+    return rc_name_resolve_id(RC_NAME_KIND_SIGNAL, name);
 }
 
 RwId rw_track_find(const char *name)
@@ -175,7 +178,7 @@ RwId rw_track_find(const char *name)
             return e->tracks[i].id;
         }
     }
-    return RW_ID_NONE;
+    return rc_name_resolve_id(RC_NAME_KIND_TRACK, name);
 }
 
 RwId rw_point_find(const char *name)
@@ -194,7 +197,7 @@ RwId rw_point_find(const char *name)
             return e->points[i].id;
         }
     }
-    return RW_ID_NONE;
+    return rc_name_resolve_id(RC_NAME_KIND_POINT, name);
 }
 
 RwId rw_route_find(const char *name)
@@ -218,7 +221,7 @@ RwId rw_train_find(const char *name)
             return e->trains[i].id;
         }
     }
-    return RW_ID_NONE;
+    return rc_name_resolve_id(RC_NAME_KIND_TRAIN, name);
 }
 
 /* --------------------------------------------------------------------------
