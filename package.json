@@ -8,7 +8,9 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node scripts/launch.js",
+    "launch": "node scripts/launch.js",
+    "boot": "node src/index.js",
     "dev": "node --watch src/index.js",
     "tcp": "node src/index.js --tcp-only",
     "db:init": "node scripts/db-init.js",

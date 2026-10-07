@@ -22,6 +22,7 @@
 #include "rc_account.h"
 #include "rc_version.h"
 #include "conjob.h"
+#include "persist.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -407,6 +408,8 @@ static TerminalStatus cmd_script(TokenList *args, Output *out, TerminalResult *r
 static TerminalStatus cmd_lua(TokenList *args, Output *out, TerminalResult *result);
 static TerminalStatus cmd_save(TokenList *args, Output *out, TerminalResult *result);
 static TerminalStatus cmd_load(TokenList *args, Output *out, TerminalResult *result);
+static TerminalStatus cmd_check(TokenList *args, Output *out, TerminalResult *result);
+static TerminalStatus cmd_timetable(TokenList *args, Output *out, TerminalResult *result);
 static TerminalStatus cmd_quit(TokenList *args, Output *out, TerminalResult *result);
 static TerminalStatus cmd_invariants(TokenList *args, Output *out, TerminalResult *result);
 static TerminalStatus cmd_account(TokenList *args, Output *out, TerminalResult *result);
@@ -436,8 +439,10 @@ static const CommandSpec g_commands[] = {
     {"SET", "SET <key> <value>", "Change a runtime setting", PERM_CHANGE_SETTINGS, cmd_set},
     {"SCRIPT", "SCRIPT <file.lua>", "Run a Lua script", PERM_RUN_SCRIPTS, cmd_script},
     {"LUA", "LUA <expression>", "Evaluate a Lua expression", PERM_RUN_SCRIPTS, cmd_lua},
-    {"SAVE", "SAVE <path>", "Write a state snapshot", PERM_CHANGE_SETTINGS, cmd_save},
-    {"LOAD", "LOAD <path>", "Restore a state snapshot", PERM_CHANGE_SETTINGS, cmd_load},
+    {"SAVE", "SAVE [LAYOUT|FLEET|TIMETABLE] <path>", "Write a state snapshot", PERM_CHANGE_SETTINGS, cmd_save},
+    {"LOAD", "LOAD [LAYOUT|FLEET|TIMETABLE] <path>", "Restore a state snapshot", PERM_CHANGE_SETTINGS, cmd_load},
+    {"CHECK", "CHECK <path>", "Describe a snapshot without loading it", PERM_VIEW_DIAGRAM, cmd_check},
+    {"TIMETABLE", "TIMETABLE [LOAD|SAVE|SHOW] [path]", "Working timetable", PERM_VIEW_DIAGRAM, cmd_timetable},
     {"ACCOUNT", "ACCOUNT <LIST|WHOAMI|PERMS|UNLOCK|ROLE|PASSWORD|CREATE|REMOVE> [args]", "Account administration", PERM_MANAGE_ACCOUNTS, cmd_account},
     {"LOGOFF", "LOGOFF", "End the signed-in session", PERM_VIEW_DIAGRAM, cmd_logoff},
     {"AUTHLOG", "AUTHLOG [count]", "Show the authentication log", PERM_VIEW_LOGS, cmd_authlog},
@@ -1730,29 +1735,199 @@ static TerminalStatus cmd_lua(TokenList *args, Output *out, TerminalResult *resu
 
 /* ==========================================================================
  * SAVE / LOAD
+ *
+ * These were stubs that printed a confirmation while writing nothing. They now
+ * call the persistence layer, and report its result honestly - a save that
+ * failed says so, rather than claiming success.
+ *
+ *   SAVE <path>              a full snapshot (layout + fleet + running state)
+ *   SAVE LAYOUT <path>       just the track/point/signal/sensor layout
+ *   SAVE FLEET <path>        just the trains and their formations
+ *   SAVE TIMETABLE <path>    the working timetable
+ *   LOAD <path>              restore everything in the file
+ *   LOAD LAYOUT <path>       restore the layout only
+ *   LOAD TIMETABLE <path>    load the working timetable
+ *   CHECK <path>             describe a file without applying it
  * ========================================================================== */
 static TerminalStatus cmd_save(TokenList *args, Output *out, TerminalResult *result)
 {
+    RcPersistResult report;
+    const char *path;
+    RcSaveScope scope = RC_SAVE_STANDARD;
+    RwResult outcome;
+
     (void)result;
+
     if (args->count < 2)
     {
-        out_line(out, "usage: SAVE <path>");
+        out_line(out, "usage: SAVE [LAYOUT|FLEET|TIMETABLE] <path>");
         return TERM_ERR_SYNTAX;
     }
-    out_printf(out, "Snapshot written to %s\n", args->tokens[1]);
+
+    /* An optional section word before the path selects a partial save. */
+    if (args->count >= 3)
+    {
+        if (iequals(args->tokens[1], "LAYOUT"))         scope = RC_SAVE_LAYOUT;
+        else if (iequals(args->tokens[1], "FLEET"))     scope = RC_SAVE_FLEET;
+        else if (iequals(args->tokens[1], "TIMETABLE")) scope = RC_SAVE_TIMETABLE;
+        path = args->tokens[2];
+    }
+    else
+    {
+        path = args->tokens[1];
+    }
+
+    if (scope == RC_SAVE_TIMETABLE)
+    {
+        outcome = rc_timetable_save(path, &report);
+    }
+    else
+    {
+        outcome = rc_save_snapshot_scoped(path, scope, &report);
+    }
+
+    if (outcome != RW_OK)
+    {
+        out_printf(out, "SAVE FAILED: %s\n", rc_persist_last_error());
+        return TERM_ERR_IO;
+    }
+
+    out_printf(out, "Saved %s\n", path);
+    out_printf(out, "  %s\n", report.message);
     return TERM_OK;
 }
 
 static TerminalStatus cmd_load(TokenList *args, Output *out, TerminalResult *result)
 {
-    (void)result;
+    RcPersistResult report;
+    const char *path;
+    RcSaveScope scope = RC_SAVE_LAYOUT | RC_SAVE_FLEET;
+    RwResult outcome;
+
     if (args->count < 2)
     {
-        out_line(out, "usage: LOAD <path>");
+        out_line(out, "usage: LOAD [LAYOUT|FLEET|TIMETABLE] <path>");
         return TERM_ERR_SYNTAX;
     }
-    out_printf(out, "Snapshot restored from %s\n", args->tokens[1]);
+
+    if (args->count >= 3)
+    {
+        if (iequals(args->tokens[1], "LAYOUT"))         scope = RC_SAVE_LAYOUT;
+        else if (iequals(args->tokens[1], "FLEET"))     scope = RC_SAVE_FLEET;
+        else if (iequals(args->tokens[1], "TIMETABLE")) scope = RC_SAVE_TIMETABLE;
+        path = args->tokens[2];
+    }
+    else
+    {
+        path = args->tokens[1];
+    }
+
+    if (scope == RC_SAVE_TIMETABLE)
+    {
+        outcome = rc_timetable_load(path, &report);
+    }
+    else
+    {
+        outcome = rc_load_snapshot(path, scope, &report);
+    }
+
+    if (outcome != RW_OK)
+    {
+        out_printf(out, "LOAD FAILED: %s\n", rc_persist_last_error());
+        out_printf(out, "  The engine was not changed.\n");
+        return TERM_ERR_IO;
+    }
+
+    out_printf(out, "Loaded %s\n", path);
+    out_printf(out, "  %s\n", report.message);
     result->request_refresh = true;
+    return TERM_OK;
+}
+
+/* ==========================================================================
+ * CHECK - describe a snapshot without applying it
+ *
+ * The companion to LOAD. An operator should be able to see what a file holds
+ * before replacing the live layout with it.
+ * ========================================================================== */
+static TerminalStatus cmd_check(TokenList *args, Output *out, TerminalResult *result)
+{
+    RcPersistResult report;
+
+    (void)result;
+
+    if (args->count < 2)
+    {
+        out_line(out, "usage: CHECK <path>");
+        return TERM_ERR_SYNTAX;
+    }
+
+    if (!rc_persist_file_exists(args->tokens[1]))
+    {
+        out_printf(out, "No such file: %s\n", args->tokens[1]);
+        return TERM_ERR_IO;
+    }
+
+    if (rc_persist_inspect(args->tokens[1], &report) != RW_OK)
+    {
+        out_printf(out, "Cannot read %s: %s\n", args->tokens[1], rc_persist_last_error());
+        return TERM_ERR_IO;
+    }
+
+    out_printf(out, "%s\n", args->tokens[1]);
+    out_printf(out, "  %s\n", report.message);
+    out_line(out, "Load it with: LOAD <path>");
+    return TERM_OK;
+}
+
+/* ==========================================================================
+ * TIMETABLE - the working timetable  (⏱️)
+ *
+ *   TIMETABLE              show what is loaded
+ *   TIMETABLE LOAD <path>  load a working timetable
+ *   TIMETABLE SAVE <path>  write the current one back out
+ * ========================================================================== */
+static TerminalStatus cmd_timetable(TokenList *args, Output *out, TerminalResult *result)
+{
+    RcPersistResult report;
+
+    (void)result;
+
+    if (args->count >= 3 && iequals(args->tokens[1], "LOAD"))
+    {
+        if (rc_timetable_load(args->tokens[2], &report) != RW_OK)
+        {
+            out_printf(out, "TIMETABLE LOAD FAILED: %s\n", rc_persist_last_error());
+            return TERM_ERR_IO;
+        }
+        out_printf(out, "Working timetable loaded from %s\n", args->tokens[2]);
+        out_printf(out, "  %s\n", report.message);
+        return TERM_OK;
+    }
+
+    if (args->count >= 3 && iequals(args->tokens[1], "SAVE"))
+    {
+        if (rc_timetable_save(args->tokens[2], &report) != RW_OK)
+        {
+            out_printf(out, "TIMETABLE SAVE FAILED: %s\n", rc_persist_last_error());
+            return TERM_ERR_IO;
+        }
+        out_printf(out, "Working timetable written to %s\n", args->tokens[2]);
+        out_printf(out, "  %s\n", report.message);
+        return TERM_OK;
+    }
+
+    /* No argument, or SHOW: render what is held. */
+    {
+        char text[4096];
+
+        if (rc_timetable_format(text, sizeof(text)) != RW_OK)
+        {
+            out_line(out, "Cannot render the timetable.");
+            return TERM_ERR_IO;
+        }
+        out_printf(out, "%s", text);
+    }
     return TERM_OK;
 }
 

@@ -76,6 +76,10 @@ function startHttp(config, db, logger) {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
+    // Static dashboard assets (public/) are served before the API so a file
+    // named like a route can never shadow one.
+    if (serveStatic(req, res, url, logger)) return;
+
     if (url.pathname === '/health' || url.pathname === '/api/health') {
       const state = safeCount(db, 'users');
       return sendJson(res, 200, {
@@ -88,12 +92,35 @@ function startHttp(config, db, logger) {
       });
     }
 
+    // Row endpoint used by the dashboard grid: /api/rows?table=users&limit=200
+    if (url.pathname === '/api/rows') {
+      const requested = (url.searchParams.get('table') || '').toLowerCase();
+      const allowed = allowedTables(config);
+      if (!allowed.includes(requested)) {
+        return sendJson(res, 404, { error: `Unknown resource: ${requested}` });
+      }
+
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '500', 10) || 500, 1), 5000);
+      try {
+        const rows = db.prepare(`SELECT * FROM ${requested} LIMIT ?`).all(limit);
+        return sendJson(res, 200, { table: requested, count: rows.length, rows });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    }
+
+    // The menu tree and key map, so the client builds its chrome from the
+    // same configuration the server knows about.
+    if (url.pathname === '/api/menu') {
+      return sendJson(res, 200, {
+        system: config.system.name,
+        menus: dashboardMenu(config),
+      });
+    }
+
     if (url.pathname.startsWith('/api/')) {
       const table = url.pathname.slice('/api/'.length).replace(/[^a-z_]/gi, '');
-      const allowed = (config.spreadsheet.tables || [])
-        .map((t) => t.name.toLowerCase().replace(/s$/, ''))
-        .concat(['users', 'datasets', 'jobs', 'transactions', 'audit_log']);
-      if (allowed.includes(table)) {
+      if (allowedTables(config).includes(table)) {
         try {
           const rows = db.prepare(`SELECT * FROM ${table} LIMIT 500`).all();
           return sendJson(res, 200, { table, count: rows.length, rows });
@@ -215,40 +242,169 @@ function sendHtml(res, status, body) {
   res.end(body);
 }
 
-/** A minimal operator dashboard, rendered from the live database. */
+/**
+ * Tables the API will expose.
+ *
+ * The dashboard's panels are declared by table name, so the names must be the
+ * real ones. An earlier version stripped a trailing "s" from the configured
+ * spreadsheet names as a singularisation heuristic, which produced "user" for
+ * USERS and left AUDIT_LOG untouched - neither of which is a table, so every
+ * request 404'd.
+ */
+function allowedTables(config) {
+  const fromConfig = (config.spreadsheet.tables || [])
+    .map((t) => String(t.name || '').toLowerCase());
+
+  const operational = [
+    'users', 'datasets', 'jobs', 'transactions', 'audit_log',
+    'dataset_records', 'volumes', 'system_parameters',
+  ];
+
+  return fromConfig
+    .concat(operational)
+    .map((name) => name.trim())
+    .filter((name) => /^[a-z][a-z0-9_]*$/.test(name))
+    .filter((name, index, all) => all.indexOf(name) === index)
+    .sort();
+}
+
+/**
+ * The dashboard's menu tree, served so the client chrome is described by the
+ * server rather than hard-coded twice.
+ */
+function dashboardMenu(config) {
+  const panelHref = (id, label) => ({ id, label, action: `nav.${id}` });
+
+  return [
+    {
+      id: 'file',
+      label: 'File',
+      items: [
+        { id: 'refresh', label: 'Refresh All', action: 'app.refresh' },
+        { label: '-' },
+        { id: 'export', label: 'Export Panel', action: 'data.export' },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'View',
+      items: [
+        {
+          id: 'panels',
+          label: 'Go to Panel',
+          children: [
+            panelHref('status', 'Status'),
+            panelHref('users', 'Users'),
+            panelHref('datasets', 'Datasets'),
+            panelHref('jobs', 'Jobs'),
+          ],
+        },
+        { id: 'theme', label: 'Toggle Theme', action: 'app.toggleTheme' },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Help',
+      items: [
+        { id: 'keys', label: 'Keyboard Shortcuts', action: 'app.help' },
+        { id: 'about', label: 'About', action: 'help.about' },
+      ],
+    },
+  ].map((menu) => ({ ...menu, title: menu.label, system: config.system.name }));
+}
+
+/**
+ * Serve a file from public/. Returns true when the request was handled.
+ *
+ * The path is resolved and then checked to still live inside public/, so a
+ * request for /../src/index.js cannot read files outside the asset root.
+ */
+function serveStatic(req, res, url, logger) {
+  const publicDir = path.join(ROOT, 'public');
+  const requested = url.pathname === '/' ? '/index.html' : url.pathname;
+
+  // The component library and keybind registry live with the source so they
+  // can be unit tested in Node; expose them under their bare names.
+  const aliases = {
+    '/components.js': path.join(ROOT, 'src', 'ui', 'components.js'),
+    '/keybinds.js': path.join(ROOT, 'src', 'ui', 'keybinds.js'),
+    '/views.js': path.join(ROOT, 'src', 'ui', 'views.js'),
+  };
+
+  let target = aliases[requested];
+  if (!target) {
+    target = path.resolve(publicDir, `.${requested}`);
+    // Refuse anything that climbed out of the asset root
+    // (/../src/index.js must not be readable).
+    if (!target.startsWith(publicDir + path.sep)) return false;
+  }
+
+  if (!fs.existsSync(target) || !fs.statSync(target).isFile()) return false;
+
+  const types = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.png': 'image/png',
+  };
+
+  const body = fs.readFileSync(target);
+  res.writeHead(200, {
+    'content-type': types[path.extname(target).toLowerCase()] || 'application/octet-stream',
+    'content-length': body.length,
+    'cache-control': 'no-cache',
+  });
+  res.end(req.method === 'HEAD' ? undefined : body);
+  if (logger) logger.debug(`[http] static ${requested}`);
+  return true;
+}
+
+/**
+ * The operator dashboard shell.
+ *
+ * The page is intentionally thin: it embeds the resolved system identity and
+ * the panel list, then hands off to public/dashboard.js, which builds the menu
+ * bar, submenus, toolbar buttons, tabs, grid and command palette. Rendering
+ * data client-side is what makes the console interactive (sorting, filtering,
+ * keyboard navigation) without a round trip per keystroke.
+ */
 function dashboard(config, db) {
-  const sections = (config.spreadsheet.tables || [])
-    .map((t) => {
-      let rows = [];
-      try {
-        rows = db.prepare(`${t.query} LIMIT 25`).all();
-      } catch { /* ignore */ }
-      if (!rows.length) return `<h2>${t.name}</h2><p>(no rows)</p>`;
-      const columns = Object.keys(rows[0]);
-      const head = columns.map((c) => `<th>${c}</th>`).join('');
-      const body = rows.map((r) => `<tr>${columns.map((c) => `<td>${escapeHtml(r[c])}</td>`).join('')}</tr>`).join('');
-      return `<h2>${t.name}</h2><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-    })
-    .join('\n');
+  const panels = (config.spreadsheet.tables || []).map((t) => ({
+    id: t.name.toLowerCase().replace(/s$/, ''),
+    label: t.name,
+  }));
+
+  const bootstrap = {
+    system: {
+      name: config.system.name,
+      sysplex: config.system.sysplex,
+      region: config.system.region,
+      version: config.system.version || '1.0.0',
+    },
+    panels,
+    httpPort: config.http.port,
+    terminalPort: config.tcp.terminalPort,
+    generatedAt: new Date().toISOString(),
+  };
 
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${config.system.name} - Operator Dashboard</title>
-<style>
-  body { font-family: Consolas, monospace; background: #0b0f14; color: #d7e3ee; margin: 24px; }
-  h1 { font-size: 18px; } h2 { font-size: 14px; color: #7fc6ff; margin-top: 24px; }
-  table { border-collapse: collapse; font-size: 12px; }
-  th, td { border: 1px solid #263345; padding: 3px 8px; text-align: left; }
-  th { background: #16202e; }
-  .meta { color: #7d8fa3; font-size: 12px; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(config.system.name)} - Operator Console</title>
+<link rel="stylesheet" href="/dashboard.css">
 </head>
 <body>
-<h1>${config.system.name} - ${config.system.sysplex} / ${config.system.region}</h1>
-<p class="meta">version ${config.system.version || '1.0.0'} &middot; ${new Date().toISOString()} &middot; <a href="/api/health">/api/health</a></p>
-${sections}
+<div id="app"></div>
+<script>window.MF_BOOTSTRAP = ${JSON.stringify(bootstrap).replace(/</g, '\\u003c')};</script>
+<script src="/components.js"></script>
+<script src="/keybinds.js"></script>
+<script src="/views.js"></script>
+<script src="/dashboard.js"></script>
 </body>
 </html>`;
 }

@@ -1,0 +1,1043 @@
+/* ==========================================================================
+   Mainframe Operator Console - interactive dashboard styles
+   Dark terminal palette by default, with a light theme toggled by
+   View > Toggle Theme (ctrl+shift+l).
+   ========================================================================== */
+
+:root {
+  --bg: #0b0f14;
+  --bg-raise: #111823;
+  --bg-panel: #16202e;
+  --border: #263345;
+  --text: #d7e3ee;
+  --text-dim: #7d8fa3;
+  --accent: #7fc6ff;
+  --accent-strong: #4aa8f0;
+  --ok: #5fd08a;
+  --warn: #e8b45a;
+  --error: #ff6b6b;
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+}
+
+body.theme-light {
+  --bg: #f4f6f9;
+  --bg-raise: #ffffff;
+  --bg-panel: #e8edf3;
+  --border: #c3ced9;
+  --text: #1d2733;
+  --text-dim: #5a6b7c;
+  --accent: #0f6fc4;
+  --accent-strong: #0a5aa0;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* --- Header and toolbar -------------------------------------------------- */
+
+.mf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-raise);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.mf-brand {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.mf-toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --- Buttons ------------------------------------------------------------- */
+
+.mf-btn {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.mf-btn:hover { background: #1d2a3b; border-color: var(--accent-strong); }
+body.theme-light .mf-btn:hover { background: #d9e3ee; }
+
+.mf-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mf-btn.is-primary {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: #04121f;
+  font-weight: 600;
+}
+
+.mf-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.mf-toolbar-btn { white-space: nowrap; }
+
+/* --- Menu bar ------------------------------------------------------------ */
+
+.mf-menubar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.mf-menu-title {
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.mf-menu-title:hover,
+.mf-menu-title.is-open { background: var(--accent-strong); color: #04121f; }
+
+.mf-menu-panel {
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  min-width: 240px;
+  background: var(--bg-raise);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  z-index: 40;
+}
+
+.mf-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mf-menu-item.is-active { background: var(--accent-strong); color: #04121f; }
+.mf-menu-item.is-disabled { opacity: 0.4; cursor: default; }
+.mf-menu-label { flex: 1; }
+.mf-menu-accel { color: var(--text-dim); font-size: 11px; }
+.mf-menu-item.is-active .mf-menu-accel { color: #04121f; }
+.mf-menu-arrow { font-size: 9px; }
+.mf-menu-sep { height: 1px; margin: 4px 0; background: var(--border); }
+
+/* --- Panel titles and tabs ---------------------------------------------- */
+
+.mf-panel-titles,
+.mf-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raise);
+}
+
+.mf-panel-title,
+.mf-tab {
+  font: inherit;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.mf-panel-title:hover,
+.mf-tab:hover { color: var(--text); }
+
+.mf-panel-title.is-active,
+.mf-tab.is-active {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+  font-weight: 600;
+}
+
+/* --- Data grid ----------------------------------------------------------- */
+
+.mf-grid-host { flex: 1; padding: 12px; overflow: auto; }
+.mf-table-wrap { overflow: auto; max-height: 100%; }
+
+.mf-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.mf-table th,
+.mf-table td {
+  border: 1px solid var(--border);
+  padding: 4px 9px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mf-table th {
+  background: var(--bg-panel);
+  cursor: pointer;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.mf-table th:hover { color: var(--accent); }
+.mf-table th.is-sorted { color: var(--accent); }
+
+.mf-table tbody tr:hover { background: rgba(127, 198, 255, 0.08); }
+.mf-table tbody tr.is-selected { background: rgba(74, 168, 240, 0.28); }
+
+.mf-empty { color: var(--text-dim); padding: 12px; }
+
+/* --- Overlays: dialogs, palette, toasts --------------------------------- */
+
+.mf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 13, 0.66);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 60;
+}
+
+.mf-overlay[hidden] { display: none; }
+
+.mf-dialog,
+.mf-palette {
+  background: var(--bg-raise);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+  width: 440px;
+  max-width: 92vw;
+  padding: 16px;
+}
+
+.mf-dialog.is-wide { width: 720px; }
+
+.mf-dialog-title { margin: 0 0 6px; font-size: 14px; color: var(--accent); }
+.mf-dialog-text { margin: 0 0 12px; color: var(--text-dim); }
+.mf-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mf-input {
+  font: inherit;
+  width: 100%;
+  padding: 6px 9px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.mf-input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+.mf-help-scroll { max-height: 52vh; overflow: auto; }
+
+.mf-palette-list { margin-top: 10px; max-height: 46vh; overflow: auto; }
+
+.mf-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mf-palette-item.is-active { background: var(--accent-strong); color: #04121f; }
+.mf-palette-label { flex: 1; }
+.mf-palette-desc { color: var(--text-dim); font-size: 11px; }
+.mf-palette-item.is-active .mf-palette-desc { color: #04121f; }
+.mf-palette-accel { font-size: 11px; opacity: 0.8; }
+.mf-palette-empty { padding: 12px; color: var(--text-dim); }
+
+/* --- Toasts -------------------------------------------------------------- */
+
+.mf-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 70;
+}
+
+.mf-toast {
+  padding: 8px 14px;
+  border-radius: 3px;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-raise);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  max-width: 380px;
+}
+
+.mf-toast.is-success { border-left-color: var(--ok); }
+.mf-toast.is-warn { border-left-color: var(--warn); }
+.mf-toast.is-error { border-left-color: var(--error); }
+
+/* --- Status bar ---------------------------------------------------------- */
+
+.mf-statusbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 14px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* --- Narrow screens ------------------------------------------------------ */
+
+@media (max-width: 720px) {
+  .mf-header { flex-direction: column; align-items: flex-start; }
+  .mf-menu-panel { min-width: 200px; }
+}
+
+/* ==========================================================================
+   Boot loader - the IPL splash shown while the console warms up
+   ========================================================================== */
+
+.mf-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  transition: opacity 300ms ease;
+}
+
+.mf-boot.is-done { opacity: 0; pointer-events: none; }
+.mf-boot.is-failed { background: var(--bg); }
+
+/* The frame is deliberately console-shaped: a wide, dark terminal well with
+   the chrome of a serial console around it. */
+.mf-boot-frame {
+  width: 780px;
+  max-width: 94vw;
+  height: 78vh;
+  max-height: 620px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: #05080c;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+}
+
+.mf-boot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mf-boot-brand {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.mf-boot-sub {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.mf-boot-indicator {
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: var(--bg-panel);
+  color: var(--warn);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mf-boot-indicator.is-ready { color: var(--ok); }
+.mf-boot-indicator.is-failed { color: var(--error); }
+
+/* --- The scrolling kernel log ------------------------------------------- */
+
+.mf-boot-console {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 2px;
+  font-size: 12px;
+  line-height: 1.55;
+  /* A console is a fixed grid of characters; keep it monospaced and unwrapped. */
+  white-space: pre;
+  scrollbar-width: thin;
+}
+
+.mf-boot-line { color: #9fb0c2; }
+.mf-boot-line.is-info { color: #9fb0c2; }
+.mf-boot-line.is-error { color: var(--error); }
+
+/* systemd-style unit results stand out from the kernel chatter. */
+.mf-boot-unit {
+  padding: 1px 0;
+  font-weight: 600;
+}
+
+.mf-boot-unit.is-ok { color: var(--ok); }
+.mf-boot-unit.is-failed { color: var(--error); }
+
+.mf-boot-prompt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  color: var(--text-dim);
+}
+
+/* A blinking block cursor, the way a real console parks one. */
+.mf-boot-cursor {
+  display: inline-block;
+  width: 9px;
+  height: 15px;
+  background: var(--accent);
+  animation: mf-blink 1.1s steps(1) infinite;
+}
+
+@keyframes mf-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-boot-cursor { animation: none; }
+}
+
+/* --- Progress footer ----------------------------------------------------- */
+
+.mf-boot-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.mf-boot-stage { white-space: nowrap; }
+
+.mf-boot-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-panel);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mf-boot-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  transition: width 260ms ease;
+}
+
+.mf-boot-percent { color: var(--accent); white-space: nowrap; }
+
+/* ==========================================================================
+   Loading screen - the inline placeholder for a slow panel
+   ========================================================================== */
+
+.mf-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 56px 16px;
+  color: var(--text-dim);
+}
+
+.mf-loading-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: mf-spin 700ms linear infinite;
+}
+
+@keyframes mf-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-loading-spinner { animation-duration: 2s; }
+  .mf-boot-fill { transition: none; }
+}
+
+.mf-loading-label { font-size: 12px; letter-spacing: 0.05em; }
+
+/* ==========================================================================
+   Window panes - dockable system views
+   ========================================================================== */
+
+.mf-pane-host {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* the host is a layer; only panes take the mouse */
+  z-index: 50;
+}
+
+.mf-pane {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--bg-raise);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mf-pane.is-dragging { opacity: 0.9; cursor: grabbing; }
+.mf-pane.is-collapsed .mf-pane-body { display: none; }
+
+.mf-pane-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mf-pane-title {
+  flex: 1;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.mf-pane-btn {
+  font: inherit;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mf-pane-btn:hover { background: var(--border); }
+
+.mf-pane-body {
+  padding: 12px;
+  overflow: auto;
+}
+
+.mf-pane-heading {
+  margin: 16px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* Definition lists: the standard key/value block in a system view. */
+.mf-defs {
+  display: grid;
+  grid-template-columns: minmax(120px, 40%) 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.mf-defs dt { color: var(--text-dim); }
+.mf-defs dd { margin: 0; color: var(--text); }
+
+/* Distribution bars. */
+.mf-dist { display: flex; flex-direction: column; gap: 5px; font-size: 11px; }
+
+.mf-dist-row {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mf-dist-label { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.mf-dist-bar { height: 8px; background: var(--bg-panel); border-radius: 4px; overflow: hidden; }
+.mf-dist-fill { display: block; height: 100%; background: var(--accent-strong); }
+.mf-dist-count { color: var(--text-dim); white-space: nowrap; }
+
+/* ==========================================================================
+   Game menu - the full-screen title and pause menu
+   ========================================================================== */
+
+.mf-game {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* A darkened backdrop: the console stays visible behind the menu. */
+  background: rgba(4, 8, 13, 0.82);
+  backdrop-filter: blur(2px);
+}
+
+.mf-game-panel {
+  width: 720px;
+  max-width: 94vw;
+  padding: 24px 28px 18px;
+  background: var(--bg-raise);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+.mf-game-title {
+  font-size: 22px;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.mf-game-subtitle {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* Levels sit side by side, the way a stacked game menu opens to the right. */
+.mf-game-columns {
+  display: flex;
+  gap: 18px;
+  margin: 18px 0 12px;
+}
+
+.mf-game-column {
+  flex: 1 1 0;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 12px;
+}
+
+.mf-game-column:first-child { border-left: none; padding-left: 0; }
+
+.mf-game-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mf-game-item.is-active {
+  background: var(--accent-strong);
+  color: #04121f;
+}
+
+.mf-game-item.is-disabled { opacity: 0.4; cursor: default; }
+
+.mf-game-marker { width: 10px; color: var(--accent); }
+.mf-game-item.is-active .mf-game-marker { color: #04121f; }
+
+.mf-game-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+.mf-game-item-hint,
+.mf-game-value,
+.mf-game-arrow {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.mf-game-item.is-active .mf-game-item-hint,
+.mf-game-item.is-active .mf-game-value,
+.mf-game-item.is-active .mf-game-arrow { color: #04121f; }
+
+.mf-game-arrow { font-size: 9px; }
+
+.mf-game-sep {
+  height: 1px;
+  margin: 5px 0;
+  background: var(--border);
+}
+
+/* Slider gauge and switch state. */
+.mf-game-gauge {
+  width: 80px;
+  height: 8px;
+  background: var(--bg-panel);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mf-game-item.is-active .mf-game-gauge { background: rgba(4, 18, 31, 0.35); }
+
+.mf-game-gauge-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms ease;
+}
+
+.mf-game-switch {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.mf-game-switch.is-on {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.mf-game-item.is-active .mf-game-switch { border-color: #04121f; color: #04121f; }
+
+.mf-game-hint {
+  min-height: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-game-gauge-fill { transition: none; }
+}
+
+/* ==========================================================================
+   Console display settings, toggled from the game menu's Options column
+   ========================================================================== */
+
+/*
+ * Scanlines: the faint horizontal banding of a CRT. Deliberately very subtle -
+ * it should read as texture, not as stripes over the data.
+ */
+body.mf-scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Compact rows: a denser grid for operators scanning long tables. */
+body.mf-compact .mf-table th,
+body.mf-compact .mf-table td {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+body.mf-compact .mf-pane-body { padding: 8px; }
+
+/*
+ * Timestamps hidden. The audit and transaction panels are the ones with a
+ * time column, so this targets those cells rather than hiding data wholesale.
+ */
+body.mf-no-timestamps .mf-table td:last-child,
+body.mf-no-timestamps .mf-table th:last-child {
+  color: var(--text-dim);
+}
+
+/* ==========================================================================
+   Window manager - the desktop, its windows and the taskbar
+   ========================================================================== */
+
+/*
+ * The desktop is a layer above the console but below the modals (game menu
+ * 80, boot 90, toasts 70). It is click-through except on the windows and the
+ * taskbar, so the grid underneath stays usable.
+ */
+.mf-wm {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.mf-desktop {
+  position: absolute;
+  inset: 0 0 30px 0;
+  pointer-events: none;
+}
+
+.mf-desktop > * { pointer-events: auto; }
+
+/* --- Windows ------------------------------------------------------------- */
+
+.mf-pane {
+  position: absolute;
+  max-height: 82vh;
+  background: var(--bg-raise);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mf-pane.is-focused {
+  border-color: var(--accent);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.68);
+}
+
+.mf-pane.is-focused .mf-pane-titlebar { background: #1b2a3d; }
+body.theme-light .mf-pane.is-focused .mf-pane-titlebar { background: #d3e0ee; }
+
+.mf-pane.is-minimized { display: none; }
+
+.mf-pane.is-maximized {
+  border-radius: 0;
+  max-height: none;
+}
+
+.mf-pane.is-dragging { opacity: 0.92; cursor: grabbing; }
+.mf-pane.is-collapsed .mf-pane-body { display: none; }
+
+.mf-pane-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mf-pane-title {
+  flex: 1;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mf-pane-btn {
+  font: inherit;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mf-pane-btn:hover { background: var(--border); }
+
+.mf-pane-body {
+  padding: 12px;
+  overflow: auto;
+}
+
+/* --- Taskbar ------------------------------------------------------------- */
+
+.mf-taskbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  pointer-events: auto;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.mf-taskbar-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.mf-taskbar-empty { color: var(--text-dim); font-size: 11px; }
+
+.mf-task {
+  font: inherit;
+  font-size: 11px;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.mf-task:hover { background: var(--border); }
+
+.mf-task.is-active {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: #04121f;
+}
+
+/* A minimized window keeps its place in the taskbar, dimmed. */
+.mf-task.is-minimized { color: var(--text-dim); font-style: italic; }
+
+/* --- Pane content widgets ------------------------------------------------ */
+
+.mf-section { margin-bottom: 6px; }
+
+.mf-pane-heading {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+}
+
+.mf-section:first-child .mf-pane-heading { margin-top: 0; }
+
+.mf-defs {
+  display: grid;
+  grid-template-columns: minmax(120px, 45%) 1fr;
+  gap: 3px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.mf-defs dt { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; }
+.mf-defs dd { margin: 0; color: var(--text); }
+
+.mf-dist { display: flex; flex-direction: column; gap: 5px; font-size: 11px; }
+
+.mf-dist-row {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mf-dist-label { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-dist-bar { height: 8px; background: var(--bg-panel); border-radius: 4px; overflow: hidden; }
+.mf-dist-fill { display: block; height: 100%; background: var(--accent-strong); }
+.mf-dist-count { color: var(--text-dim); white-space: nowrap; }
+
+.mf-list { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7; }
+
+/* --- Event list (audit trail) -------------------------------------------- */
+
+.mf-event-list { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+
+.mf-event {
+  display: grid;
+  grid-template-columns: 132px 76px 1fr;
+  gap: 8px;
+  padding: 2px 4px;
+  border-left: 2px solid var(--border);
+}
+
+.mf-event.is-error,
+.mf-event.is-critical { border-left-color: var(--error); }
+.mf-event.is-warn { border-left-color: var(--warn); }
+.mf-event.is-info { border-left-color: var(--accent); }
+
+.mf-event-time { color: var(--text-dim); }
+.mf-event-actor { color: var(--accent); }
+.mf-event-message { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- A view that threw --------------------------------------------------- */
+
+.mf-view-error {
+  padding: 12px;
+  border-left: 3px solid var(--error);
+  background: rgba(255, 107, 107, 0.08);
+  font-size: 12px;
+}
+
+.mf-view-error strong { color: var(--error); }
+.mf-view-error p { margin: 6px 0 0; color: var(--text-dim); }
+
+/* Wireframe monospace only needs the media query guard for the gauge. */
+@media (prefers-reduced-motion: reduce) {
+  .mf-dist-fill { transition: none; }
+}

@@ -68,7 +68,11 @@ const MODIFIER_ALIASES = {
 };
 
 function normaliseKeyName(name) {
-  const lowered = String(name ?? '').trim().toLowerCase();
+  const source = String(name ?? '');
+  // The space bar is a legitimate key name; trim() would turn it into "".
+  if (source === ' ') return ' ';
+
+  const lowered = source.trim().toLowerCase();
   if (lowered === '') return '';
   return KEY_ALIASES[lowered] || lowered;
 }
@@ -88,7 +92,17 @@ function normaliseModifier(name) {
  * @returns {{ctrl:boolean,alt:boolean,shift:boolean,meta:boolean,key:string}}
  */
 function parseCombo(combo) {
-  const parts = String(combo ?? '')
+  const source = String(combo ?? '');
+  const raw = source.trim().toLowerCase();
+
+  // The space bar is a single keystroke, not an empty combo. It must be
+  // detected before trim() erases it, and splitting on whitespace would
+  // discard it anyway, so it gets an explicit early return.
+  if (source === ' ' || raw === 'space' || raw === 'spacebar') {
+    return { ctrl: false, alt: false, shift: false, meta: false, key: ' ' };
+  }
+
+  const parts = source
     .split(/[+\-\s]+/)
     .map((p) => p.trim())
     .filter(Boolean);
@@ -108,7 +122,6 @@ function parseCombo(combo) {
   }
 
   // Handle the trailing-symbol case ("ctrl++", "ctrl+-").
-  const raw = String(combo ?? '').trim().toLowerCase();
   if (!result.key && (raw.endsWith('++') || raw.endsWith('+-'))) {
     result.key = raw.slice(-1);
   }
@@ -129,10 +142,15 @@ function formatCombo(combo) {
   return [...modifiers, parsed.key].join('+');
 }
 
-/** True when the combo has at least one key and is not just modifiers. */
+/**
+ * True when the combo has a real key and is not just modifiers. The space bar
+ * is a valid key: parsed.key is " ", which is truthy but must not be compared
+ * as if an empty string meant "no key".
+ */
 function isCompleteCombo(combo) {
   const parsed = typeof combo === 'string' ? parseCombo(combo) : combo;
-  return Boolean(parsed && parsed.key && !MODIFIER_KEYS.has(parsed.key));
+  if (!parsed || typeof parsed.key !== 'string' || parsed.key === '') return false;
+  return !MODIFIER_KEYS.has(parsed.key);
 }
 
 /**
@@ -149,9 +167,11 @@ function describeCombo(combo) {
     shift: 'Shift',
     meta: 'Meta',
   };
-  const prettyKey = parsed.key.length === 1
-    ? parsed.key.toUpperCase()
-    : parsed.key.charAt(0).toUpperCase() + parsed.key.slice(1);
+  const prettyKey = parsed.key === ' '
+    ? 'Space'
+    : parsed.key.length === 1
+      ? parsed.key.toUpperCase()
+      : parsed.key.charAt(0).toUpperCase() + parsed.key.slice(1);
 
   return [
     ...MODIFIER_ORDER.filter((m) => parsed[m]).map((m) => labels[m]),
@@ -341,7 +361,14 @@ class KeybindRegistry {
 function installDefaults(registry) {
   const results = [];
   const add = (action, combo, description, scope = 'global') => {
-    results.push({ action, ...registry.bind(action, combo, { description, scope }) });
+    const outcome = registry.bind(action, combo, { description, scope });
+    results.push({ action, ...outcome });
+    // Surface a bad default immediately instead of shipping a key that
+    // silently does nothing. `bind` returns a reason rather than throwing.
+    if (!outcome.ok) {
+      throw new Error(`installDefaults: cannot bind "${action}" to "${combo}": ${outcome.reason}`);
+    }
+    return outcome;
   };
 
   /* --- Global: application ------------------------------------------------ */
@@ -351,6 +378,7 @@ function installDefaults(registry) {
   add('app.toggleSidebar', 'ctrl+b', 'Show or hide the sidebar');
   add('app.toggleTheme', 'ctrl+shift+l', 'Switch between light and dark');
   add('app.closeOverlay', 'escape', 'Close the active dialog or menu');
+  add('app.gameMenu', 'f10', 'Open the console menu');
 
   /* --- Global: navigation ------------------------------------------------- */
   add('nav.panel1', 'alt+1', 'Jump to panel 1 (Status)');
@@ -360,9 +388,15 @@ function installDefaults(registry) {
   add('nav.panel5', 'alt+5', 'Jump to panel 5 (Audit log)');
   add('nav.nextPanel', 'ctrl+pagedown', 'Next panel');
   add('nav.prevPanel', 'ctrl+pageup', 'Previous panel');
-  add('nav.nextTab', 'ctrl+tab', 'Next sub-panel tab');
-  add('nav.prevTab', 'ctrl+shift+tab', 'Previous sub-panel tab');
+  add('nav.nextTab', 'ctrl+alt+pagedown', 'Next sub-panel tab');
+  add('nav.prevTab', 'ctrl+alt+pageup', 'Previous sub-panel tab');
   add('nav.focusMenu', 'alt+m', 'Focus the menu bar');
+
+  /* --- Global: windows ---------------------------------------------------- */
+  add('window.cycle', 'ctrl+tab', 'Cycle to the next open window');
+  add('window.cycleBack', 'ctrl+shift+tab', 'Cycle to the previous open window');
+  add('window.tile', 'ctrl+shift+t', 'Tile every open window');
+  add('window.cascade', 'ctrl+shift+c', 'Cascade every open window');
 
   /* --- Global: data ------------------------------------------------------- */
   add('data.search', 'ctrl+f', 'Search the active panel');
@@ -394,7 +428,7 @@ function createDefaultRegistry() {
   return registry;
 }
 
-module.exports = {
+const MFKeybinds = {
   MODIFIER_ORDER,
   MODIFIER_KEYS,
   KeybindRegistry,
@@ -406,3 +440,13 @@ module.exports = {
   installDefaults,
   createDefaultRegistry,
 };
+
+// The registry is shared between Node (tests, tooling) and the browser
+// (public/dashboard.js). Publishing the same object keeps one source of truth
+// for the key map instead of a second copy drifting inside the bundle.
+//
+// Both guards are needed: `module` does not exist in a browser, so an
+// unguarded assignment here would throw and stop the rest of the bundle from
+// loading.
+if (typeof module !== 'undefined' && module.exports) module.exports = MFKeybinds;
+if (typeof window !== 'undefined') window.MFKeybinds = MFKeybinds;
