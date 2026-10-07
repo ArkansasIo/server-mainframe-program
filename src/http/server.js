@@ -22,6 +22,7 @@ const path = require('path');
 
 const { sendJson, sendError, escapeHtml } = require('./respond');
 const { createStaticHandler } = require('./static');
+const { createAuthPolicy, createAuthGuard } = require('./auth');
 
 /* --------------------------------------------------------------------------
  * Table access
@@ -80,6 +81,15 @@ function readRows(db, table, limit) {
  * bar, submenus, toolbar buttons, tabs, grid, window manager and command
  * palette. Rendering data client-side is what makes the console interactive
  * (sorting, filtering, keyboard navigation) without a round trip per keystroke.
+ *
+ * On authentication: this page is served WITHOUT one, and deliberately does
+ * not embed an API key. A browser cannot set an Authorization header on a
+ * top-level navigation, so the shell has to be public or the console becomes
+ * unreachable - but injecting the key into it would hand the credential to
+ * anyone who can load the page, which defeats the point. The shell renders no
+ * data on its own; every request it makes is an /api/ call and is protected.
+ * In a browser, supply the key once via `?api_key=` and the client keeps it
+ * in sessionStorage; see public/dashboard.js.
  */
 function renderDashboard(config) {
   const panels = (config.spreadsheet.tables || []).map((t) => ({
@@ -305,6 +315,20 @@ function startHttpServer(config, db, logger, deps = {}) {
     logger,
   });
 
+  const policy = createAuthPolicy(config);
+  const guard = createAuthGuard({
+    policy,
+    onDenied: (req, reason) => {
+      // Logged at warn, with the address, so a misconfigured client is
+      // findable rather than presenting as a mystery 401.
+      logger.warn(`[http] refused ${req.method} ${req.url} from ${req.socket.remoteAddress}: ${reason}`);
+    },
+  });
+
+  if (policy.required) {
+    logger.info(`[http] API key auth ENABLED (${policy.keyCount} key(s), protecting /api/*)`);
+  }
+
   // A Map would be tidier, but a linear scan over a handful of routes keeps
   // the declared order visible, which is what the two aliases depend on.
   const server = http.createServer((req, res) => {
@@ -315,8 +339,19 @@ function startHttpServer(config, db, logger, deps = {}) {
       return sendError(res, 400, 'Malformed request URL');
     }
 
-    // Static assets first, so a file can never be shadowed by a route.
+    // Static assets first, so a file can never be shadowed by a route. The
+    // dashboard itself is not protected: a browser navigation cannot set an
+    // Authorization header, and the page carries no data until its own API
+    // calls run - which are protected. Protecting the shell would make the
+    // console unreachable rather than secure.
     if (serveStatic(req, res, url)) return;
+
+    // Auth sits after static and before the routes, so it applies to the data
+    // surface and nothing else.
+    if (guard(req, res, url)) {
+      res.setHeader('www-authenticate', 'Bearer realm="mainframe"');
+      return sendError(res, 401, 'Unauthorized');
+    }
 
     const route = routes.find(
       (r) => r.path === url.pathname && (r.method === req.method || req.method === 'HEAD'),
@@ -347,6 +382,7 @@ function startHttpServer(config, db, logger, deps = {}) {
   });
 
   server.routes = routes;
+  server.auth = policy;
   return server;
 }
 

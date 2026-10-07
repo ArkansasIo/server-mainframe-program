@@ -150,13 +150,46 @@ a unique key - so it is safe against a populated database. It ships:
 2 operators, 6 datasets with records, 4 jobs (including one ABEND), 6
 transactions, 3 volumes and a short audit trail.
 
-## Backup settings
+## Backups
 
-`database.backup` has `enabled`, `directory` and `retain`, and the loader
-resolves the directory. **No backup job is implemented** - the settings are read
-and reserved. A WAL-mode database should be backed up with SQLite's own
-`.backup` rather than by copying the file, since a copy taken mid-write can
-capture a torn state.
+```powershell
+npm run db:backup                       # uses database.backup settings
+npm run db:backups                      # list what exists
+node scripts/db-backup.js --retain 5    # override retention
+node scripts/db-backup.js --verify <f>  # check a file is restorable
+```
+
+The snapshot is taken with SQLite's **`VACUUM INTO`**, not by copying the file.
+That matters: the database runs in WAL mode with more than one connection, so a
+copy taken while a transaction is committing captures a torn state - the main
+file plus a `-wal` sidecar that the copy does not include. `VACUUM INTO`
+produces a single consistent file in one statement.
+
+```json
+{
+  "database": {
+    "backup": { "enabled": true, "directory": "./data/backups", "retain": 10 }
+  }
+}
+```
+
+| Setting | Meaning |
+|---|---|
+| `enabled` | When false, `db:backup` reports it skipped and exits non-zero. `--force` overrides. |
+| `directory` | Destination. Resolved against the project root. |
+| `retain` | Keep the most recent N. Older files are deleted after a successful backup. |
+
+Backups are named `<database>-<timestamp>.db`, using `2026-01-14T09-30-00` -
+sortable, and free of the colons Windows forbids in filenames. Because the
+format sorts chronologically, pruning deletes from the front of the sorted list
+without having to stat every file.
+
+Each backup is **verified after it is written**: the file is opened, its table
+list read, and `PRAGMA integrity_check` run. A backup that cannot be opened is
+worse than no backup, because it is trusted. If verification fails the command
+exits non-zero.
+
+`--verify <file>` checks an existing backup without touching the database.
 
 ## Inspecting the database
 

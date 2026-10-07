@@ -146,11 +146,65 @@ a stale-bug generator.
 
 ## Authentication
 
-`http.auth` exists in configuration (`required`, `apiKeys`) and is validated -
-if `required` is true with no keys, the loader warns that every request will be
-rejected. **Enforcement is not yet wired into the request path**, so the control
-plane is currently unauthenticated. Treat it as a trusted-network service, or
-put it behind a proxy that authenticates.
+`http.auth` is enforced when `http.auth.required` is true. It is **off by
+default**, because the console is intended to run on a trusted network.
+
+### What is protected
+
+Only `/api/*`. Static assets and the console shell stay public - a browser
+cannot set an `Authorization` header on a top-level navigation, so protecting
+the shell would make the console unreachable rather than secure. The shell
+serves no data of its own; every request it makes is an API call, and those
+are protected.
+
+### Presenting the key
+
+All four of these work:
+
+```
+Authorization: Bearer <key>
+Authorization: <key>
+X-API-Key: <key>
+?api_key=<key>
+```
+
+The query form exists because it is the only way a plain browser navigation can
+carry a credential. Open the console once as `http://host:8080/?api_key=<key>`;
+the client keeps the key in `sessionStorage` for that tab and strips it from
+the address bar so it does not end up in a bookmark or a shared link.
+
+### Enabling it
+
+```powershell
+$env:MF_HTTP_AUTH_REQUIRED = 'true'
+$env:MF_API_KEYS = 'key-one,key-two'
+```
+
+On startup the server logs `[http] API key auth ENABLED (n key(s), protecting
+/api/*)`. A refusal is logged at warn with the address and the reason, so a
+misconfigured client is findable rather than presenting as a mystery 401.
+
+### Failure behaviour
+
+| Situation | Result |
+|---|---|
+| `required` true, no keys configured | **Everything refused.** Fail closed, not open. |
+| Missing key | `401 Unauthorized` |
+| Wrong key | `401 Unauthorized` |
+| Empty key presented | `401` - an empty string never authenticates |
+| Correct key | Allowed |
+
+Keys are compared with `crypto.timingSafeEqual`, not `===`. A `===` comparison
+returns as soon as two strings differ, so the time taken reveals how many
+leading characters were correct - a practical attack against an API key. Every
+configured key is checked without short-circuiting, so the response time does
+not reveal *which* key matched either. Key **length** is not treated as secret:
+`timingSafeEqual` requires equal lengths, so a length check has to come first.
+
+### What this is not
+
+It is not TLS. A key sent over plain HTTP is readable in transit. Bind to
+`127.0.0.1` on an untrusted network, or terminate TLS in front of it.
 
 ## Examples
 

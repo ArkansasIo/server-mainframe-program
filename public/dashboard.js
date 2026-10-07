@@ -118,8 +118,48 @@
    * Data access
    * ---------------------------------------------------------------------- */
 
+  /**
+   * The API key, when the server requires one.
+   *
+   * A browser cannot set an Authorization header on a top-level navigation, so
+   * a protected console is entered once with `?api_key=<key>`. That is read
+   * here, kept in sessionStorage for the tab, and stripped from the address bar
+   * so it does not end up in a bookmark or a shared link.
+   *
+   * sessionStorage rather than localStorage: the key should not outlive the
+   * tab, and should not be shared between tabs that may be opened by someone
+   * else later.
+   */
+  const authKey = (() => {
+    try {
+      const url = new URL(window.location.href);
+      const fromQuery = url.searchParams.get('api_key');
+
+      if (fromQuery) {
+        window.sessionStorage.setItem('mf.apiKey', fromQuery);
+        url.searchParams.delete('api_key');
+        window.history.replaceState({}, '', url.toString());
+        return fromQuery;
+      }
+      return window.sessionStorage.getItem('mf.apiKey') || null;
+    } catch {
+      // Storage can be unavailable (private mode, a file:// origin). The
+      // console still works against an unprotected server.
+      return null;
+    }
+  })();
+
   async function fetchJson(url) {
-    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    const headers = { accept: 'application/json' };
+    if (authKey) headers.authorization = `Bearer ${authKey}`;
+
+    const response = await fetch(url, { headers });
+
+    if (response.status === 401) {
+      throw new Error(
+        'Not authorized. Open the console once with ?api_key=<your key> to sign in.',
+      );
+    }
     if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
     return response.json();
   }
