@@ -1,0 +1,104 @@
+{
+  "$comment": "Base configuration. Overridden by config/local.json, MF_* env vars, then CLI flags.",
+  "system": {
+    "name": "MAINFRAME-1",
+    "sysplex": "SYSPLEX-A",
+    "region": "DEFAULT",
+    "timezone": "UTC",
+    "maxConcurrentJobs": 8
+  },
+  "http": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8080,
+    "keepAliveTimeoutMs": 5000,
+    "bodyLimitBytes": 1048576,
+    "cors": {
+      "enabled": true,
+      "origins": ["*"]
+    },
+    "auth": {
+      "required": false,
+      "apiKeys": ["dev-master-key"]
+    }
+  },
+  "tcp": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "terminalPort": 3270,
+    "dataPort": 3271,
+    "banner": "WELCOME TO MAINFRAME-1 - LOGON REQUIRED"
+  },
+  "database": {
+    "driver": "sqlite",
+    "file": "./data/mainframe.db",
+    "pragma": "journal_mode = WAL; foreign_keys = ON; busy_timeout = 5000",
+    "pragmas": {
+      "journal_mode": "WAL",
+      "foreign_keys": "ON",
+      "busy_timeout": 5000
+    },
+    "autoMigrate": true,
+    "autoSeed": true,
+    "seedOnEmpty": true,
+    "pool": {
+      "size": 4
+    },
+    "backup": {
+      "enabled": true,
+      "directory": "./data/backups",
+      "retain": 10
+    }
+  },
+  "storage": {
+    "datasets": "./data/datasets",
+    "temp": "./data/tmp",
+    "spreadsheets": "./data/spreadsheets",
+    "uploads": "./data/uploads"
+  },
+  "spreadsheet": {
+    "engine": "excel",
+    "defaultSheet": "MAINFRAME",
+    "headerStyle": {
+      "bold": true,
+      "fill": "1F3864",
+      "color": "FFFFFF"
+    },
+    "export": {
+      "includeMetadataSheet": true,
+      "freezeHeaderRow": true
+    },
+    "tables": [
+      { "name": "USERS", "query": "SELECT * FROM users ORDER BY user_id" },
+      { "name": "DATASETS", "query": "SELECT * FROM datasets ORDER BY dataset_id" },
+      { "name": "JOBS", "query": "SELECT * FROM jobs ORDER BY job_id" },
+      { "name": "TRANSACTIONS", "query": "SELECT * FROM transactions ORDER BY txn_id" },
+      { "name": "AUDIT_LOG", "query": "SELECT * FROM audit_log ORDER BY log_id" }
+    ]
+  },
+  "security": {
+    "passwordPolicy": {
+      "minLength": 8,
+      "requireDigit": true,
+      "requireUpper": true,
+      "requireSymbol": false
+    },
+    "session": {
+      "ttlMinutes": 30,
+      "maxPerUser": 5
+    },
+    "audit": {
+      "enabled": true,
+      "logLogons": true,
+      "logCommands": true
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "text",
+    "directory": "./logs",
+    "file": "mainframe.log",
+    "console": true,
+    "maxFileBytes": 5242880
+  }
+}

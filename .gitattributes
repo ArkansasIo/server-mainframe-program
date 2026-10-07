@@ -1,0 +1,42 @@
+# Normalise line endings so the repository is stable across Windows, macOS
+# and Linux. Source and text files are stored with LF; the working copy gets
+# the platform's native ending.
+#
+#   * text=auto   let Git decide, and normalise to LF in the object store
+#   -text         never touch these (binary)
+#
+* text=auto
+
+# ---------------------------------------------------------------- source ----
+*.c        text diff=c
+*.h        text diff=c
+*.cpp      text diff=cpp
+*.hpp      text diff=cpp
+*.js        text
+*.json      text
+*.lua       text
+*.sql       text
+*.md        text
+*.txt       text
+*.ini       text
+*.cfg       text
+
+# --------------------------------------------------------------- build ------
+Makefile    text
+CMakeLists.txt text
+.gitattributes text
+.gitignore  text
+
+# ------------------------------------------------------------- binary -------
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.wav       binary
+*.bmp       binary
+*.xlsx      binary
+*.db        binary
+*.exe       binary
+*.dll       binary
+*.lib       binary
+*.o         binary
+*.a         binary

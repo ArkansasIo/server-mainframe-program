@@ -1,0 +1,15 @@
+{
+  "system": {
+    "name": "MAINFRAME-LOCAL"
+  },
+  "http": {
+    "port": 8080
+  },
+  "database": {
+    "driver": "sqlite",
+    "file": "./data/mainframe.db"
+  },
+  "logging": {
+    "level": "debug"
+  }
+}

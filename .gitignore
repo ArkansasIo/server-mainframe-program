@@ -1,0 +1,54 @@
+# Runtime data (databases, datasets, generated spreadsheets, backups)
+data/
+*.db
+*.db-wal
+*.db-shm
+backups/
+datasets/
+spreadsheets/
+uploads/
+tmp/
+
+# Build output (top level and the RailwayControl project)
+build/
+RailwayControl/build/
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+*.pdb
+*.ilk
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Logs
+logs/
+*.log
+
+# Spreadsheet exports produced ad-hoc
+*.xlsx
+*.csv
+
+# Node
+node_modules/
+npm-debug.log*
+.npm/
+
+# Env
+.env
+.env.local
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

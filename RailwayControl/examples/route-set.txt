@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+# RailControl batch example: exercising the interlocking and the emergency
+# stop from the command line.
+#
+# Run with:
+#   railcontrol --batch examples/route-set.txt --user admin --password Admin#2024
+#
+# Each line is one terminal command. Blank lines and lines beginning with '#'
+# are ignored. The run exits non-zero if any command failed.
+# ---------------------------------------------------------------------------
+
+# 1. The world as the signaller finds it: 5 trains, every running line with
+#    something standing on it.
+SHOW
+
+# 2. Each of these must be REFUSED, and the reason must name the exact section
+#    or point that blocks it. A refusal is the system working, not failing.
+ROUTE R1
+ROUTE R2
+ROUTE R6
+ROUTE R8
+ROUTE R9
+
+# 3. Proving the safe direction is never refused: a signal can always be put
+#    BACK to danger, in any state, by anyone.
+SIGNAL S1 DANGER
+SIGNAL S3 DANGER
+
+# 4. A signal may NOT be cleared without a route set for it. This is INV-1.
+SIGNAL S1 GREEN
+
+# 5. A point may NOT be moved while a train stands on the section feeding it.
+#    T1 is occupied by 1A34, so this is INV-3 refusing.
+POINT P1 DIVERGING
+
+# 6. A track circuit failure makes a section UNPROVEN. Restore it afterwards.
+TRACK T2 FAIL
+TRACK T2 RESTORE
+
+# 7. Trip the emergency stop. Every signal goes to danger, every route drops,
+#    every train emergency brakes.
+EMERGENCY Batch example: proving the emergency stop
+
+# 8. Clearing the emergency is deliberately hard: it is refused while any
+#    train is still moving.
+CLEAREMG
+
+# 9. The event log records everything above with timestamps and severity.
+LIST EVENTS 15

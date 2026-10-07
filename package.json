@@ -1,0 +1,36 @@
+{
+  "name": "server-mainframe",
+  "version": "1.0.0",
+  "description": "Mainframe server system: HTTP + TCP services, database layer, config system, SQL scripts and Excel/CSV spreadsheet tooling.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "tcp": "node src/index.js --tcp-only",
+    "db:init": "node scripts/db-init.js",
+    "db:seed": "node scripts/db-seed.js",
+    "db:export": "node scripts/export-spreadsheet.js",
+    "db:import": "node scripts/import-spreadsheet.js",
+    "test": "node --test tests/"
+  },
+  "keywords": [
+    "mainframe",
+    "server",
+    "database",
+    "sqlite",
+    "config",
+    "spreadsheet",
+    "excel"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "optionalDependencies": {
+    "exceljs": "^4.4.0"
+  }
+}
