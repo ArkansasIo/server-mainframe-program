@@ -1971,6 +1971,7 @@ function createGameMenu(opts) {
     open = true;
     path = nextPath;
     highlight = Math.max(0, nextSelectable(activeEntries(), -1, 1));
+    setHidden(root, false);
     render();
     return api;
   }
@@ -1979,6 +1980,7 @@ function createGameMenu(opts) {
     open = false;
     path = [];
     highlight = 0;
+    setHidden(root, true);
     render();
   }
 
@@ -2007,7 +2009,12 @@ function createGameMenu(opts) {
     render,
   };
 
+  // Build the rows once, then hide the whole overlay. Without this the menu is
+  // visible from the moment it is constructed - a full-screen modal sitting on
+  // top of the console the user has not asked for, which is exactly what a
+  // "black screen" looks like with a dimming overlay over the app.
   render();
+  setHidden(root, true);
   return api;
 }
 

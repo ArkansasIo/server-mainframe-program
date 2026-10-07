@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Mainframe Server System operator console">
+<title>Operator Console</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+
+<!--
+  Fallback document.
+
+  The server renders the live page at "/" with the resolved system identity and
+  panel list embedded (see src/http/server.js - renderDashboard). This file is
+  served for a direct request to /index.html and acts as the static equivalent,
+  so the console still comes up when the page is opened from disk or from a
+  host that serves public/ without the Node process.
+
+  It is deliberately the same structure and the same script order as the
+  rendered page. The only difference is that MF_BOOTSTRAP is absent, and the
+  client treats a missing bootstrap as "unknown identity" rather than failing.
+-->
+<div id="app">
+  <noscript>
+    <p style="font-family:monospace;color:#d7e3ee;background:#0b0f14;padding:16px">
+      The operator console is a client-rendered application and needs JavaScript.
+      The terminal gateway on port 3270 works without a browser.
+    </p>
+  </noscript>
+</div>
+
+<script>
+  // No server-rendered bootstrap here, so describe what we do not know. The
+  // client reads these fields defensively and will show the values it can.
+  window.MF_BOOTSTRAP = {
+    system: { name: 'MAINFRAME', sysplex: 'SYSPLEX', region: 'DEFAULT', version: '1.0.0' },
+    panels: [],
+    httpPort: location.port || 8080,
+    terminalPort: 3270,
+    dataPort: 3271,
+    generatedAt: new Date().toISOString(),
+    static: true
+  };
+</script>
+
+<script src="/components.js"></script>
+<script src="/keybinds.js"></script>
+<script src="/views.js"></script>
+<script src="/dashboard.js"></script>
+
+</body>
+</html>

@@ -240,6 +240,17 @@ body.theme-light .mf-btn:hover { background: #d9e3ee; }
 
 .mf-overlay[hidden] { display: none; }
 
+/*
+ * The `hidden` attribute only sets `display: none` through the user-agent
+ * stylesheet, so any explicit `display` on a class wins and the element stays
+ * visible. Every overlay that ships a `display` of its own must therefore
+ * restate the rule - without this the game menu renders open on top of the
+ * console at boot, which looks exactly like a black screen.
+ */
+.mf-game[hidden],
+.mf-boot[hidden],
+.mf-pane[hidden] { display: none; }
+
 .mf-dialog,
 .mf-palette {
   background: var(--bg-raise);

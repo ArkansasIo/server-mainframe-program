@@ -472,17 +472,8 @@ test('allowedTables exposes real table names, not singularised ones', () => {
   // A regression guard. The dashboard asks for a panel's declared table, and an
   // earlier version stripped a trailing "s" from the configured names:
   // USERS -> "user", which is not a table, so every request 404'd.
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const source = fs.readFileSync(
-    path.resolve(__dirname, '..', 'src', 'index.js'), 'utf8',
-  );
+  const { allowedTables } = require('../src/http/server');
 
-  // Pull the function out and exercise it against a representative config.
-  const match = /function allowedTables\(config\) \{[\s\S]*?\n\}/.exec(source);
-  assert.ok(match, 'allowedTables should exist in src/index.js');
-
-  const allowedTables = new Function(`${match[0]}; return allowedTables;`)();
   const config = {
     spreadsheet: {
       tables: [
@@ -505,13 +496,7 @@ test('allowedTables exposes real table names, not singularised ones', () => {
 });
 
 test('allowedTables rejects names that are not identifiers', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const source = fs.readFileSync(
-    path.resolve(__dirname, '..', 'src', 'index.js'), 'utf8',
-  );
-  const match = /function allowedTables\(config\) \{[\s\S]*?\n\}/.exec(source);
-  const allowedTables = new Function(`${match[0]}; return allowedTables;`)();
+  const { allowedTables } = require('../src/http/server');
 
   const allowed = allowedTables({
     spreadsheet: { tables: [{ name: 'bad name' }, { name: 'drop;--' }, { name: '1leading' }] },
@@ -520,6 +505,14 @@ test('allowedTables rejects names that are not identifiers', () => {
   assert.ok(!allowed.includes('bad name'));
   assert.ok(!allowed.includes('drop;--'));
   assert.ok(!allowed.includes('1leading'), 'a name may not start with a digit');
+});
+
+test('allowedTables is exposed through the entrypoint for back-compat', () => {
+  // The function used to live in src/index.js; callers that imported it from
+  // there must keep working after the split into src/http/.
+  const entry = require('../src/index');
+  assert.equal(typeof entry.allowedTables, 'function');
+  assert.deepEqual(entry.allowedTables({ spreadsheet: { tables: [] } }).includes('users'), true);
 });
 
 /* --------------------------------------------------------------------------
