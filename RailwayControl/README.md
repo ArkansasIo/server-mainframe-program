@@ -100,21 +100,53 @@ properties above.
 ```powershell
 make            # build build/rcp.exe (console) and build/rcp-gui.exe (window)
 make gui        # build only the Win32 dispatch console
-make test       # build and run the unit tests
+make test       # build and run the unit tests (see the note below)
 make run        # interactive signaller console
 make sim        # 60 second headless simulation
 make demo       # run the batch example
+make namestool  # build and run the naming diagnostics
 ```
 
-Two executables are produced, both front ends over the same engine:
+Four executables are produced, all front ends over the same engine:
 
 | Binary | Subsystem | Purpose |
 | ------ | --------- | ------- |
 | `build/rcp.exe` | console | scriptable signaller console, batch and headless runs |
 | `build/rcp-gui.exe` | Windows | Win32 GDI dispatch console with the live track diagram |
+| `build/names_tool.exe` | console | naming diagnostics: list, check, resolve, validate |
+| `build/auth_console.exe` | console | register / logon / session console for the account store |
 
 The GUI is Win32 only and is skipped on other platforms; `make gui` says so
 rather than failing.
+
+### If you do not have make
+
+The build is a plain `gcc`/`clang` invocation, so it can be run directly. From
+`RailwayControl/`, with MinGW-w64 or LLVM-MinGW:
+
+```powershell
+# console + shared engine objects
+$lib = Get-ChildItem src\*.c |
+       Where-Object { $_.Name -ne 'main.c' -and $_.Name -notlike 'win32_*' } |
+       ForEach-Object { $_.FullName }
+
+gcc -std=c17 -O2 -Iinclude -o build/rcp.exe src/main.c $lib -lwinmm -lws2_32
+
+# Win32 dispatch console
+gcc -std=c17 -O2 -Iinclude -D_WIN32_WINNT=0x0601 -municode `
+    -o build/rcp-gui.exe `
+    src/win32_entry.c src/win32_main.c src/win32_panel.c `
+    src/win32_status.c src/win32_terminal.c src/win32_actions.c `
+    $lib -lwinmm -lws2_32 -lgdi32 -luser32 -lcomdlg32 -lshell32
+
+# diagnostics + account console
+gcc -std=c17 -O2 -Iinclude -o build/names_tool.exe   tools/names_tool.c   $lib -lwinmm -lws2_32
+gcc -std=c17 -O2 -Iinclude -o build/auth_console.exe tools/auth_console.c $lib -lwinmm -lws2_32
+```
+
+> **Note on `make test`.** The unit-test suite is not present in this tree, so
+> `make test` prints that fact rather than failing. It degrades to a message
+> instead of a `No rule to make target` error.
 
 ## Running
 

@@ -27,6 +27,7 @@ LDFLAGS ?=
 
 BUILD   := build
 OBJDIR  := $(BUILD)/obj
+OUTDIR  := output
 SRCDIR  := src
 INCDIR  := include
 TESTDIR := tests
@@ -39,12 +40,14 @@ ifeq ($(OS),Windows_NT)
     RM       := cmd /c if exist "$(1)" rmdir /s /q "$(1)"
     MKDIR    := cmd /c if not exist "$(1)" mkdir "$(1)"
     MKDIRP   := cmd /c if not exist "$(1)" mkdir "$(1)"
+    CP       := copy /y
     LDLIBS   := -lwinmm -lws2_32
     CFLAGS   += -D_WIN32_WINNT=0x0601
 else
     EXE      :=
     MKDIR    := mkdir -p $(1)
     MKDIRP   := mkdir -p $(1)
+    CP       := cp -f
     LDLIBS   := -lm
     UNAME_S  := $(shell uname -s 2>/dev/null)
     ifeq ($(UNAME_S),Darwin)
@@ -57,33 +60,36 @@ endif
 
 # ---------------------------------------------------------------------------
 # Sources
+#
+# Kept in step with what is on disk: a source listed here but absent fails the
+# build with a confusing "No rule to make target" message.
 # ---------------------------------------------------------------------------
 CORE_SRC := \
     $(SRCDIR)/main.c \
     $(SRCDIR)/railway_api.c \
     $(SRCDIR)/rc_account.c \
-    $(SRCDIR)/rc_graph.c \
-    $(SRCDIR)/rc_persist.c \
+    $(SRCDIR)/rc_audio.c \
     $(SRCDIR)/rc_settings.c \
-    $(SRCDIR)/rcp_console.c \
+    $(SRCDIR)/rc_version.c \
+    $(SRCDIR)/rcp_car.c \
     $(SRCDIR)/rcp_emergency.c \
     $(SRCDIR)/rcp_eventlog.c \
     $(SRCDIR)/rcp_interlock.c \
     $(SRCDIR)/rcp_layout.c \
     $(SRCDIR)/rcp_names.c \
     $(SRCDIR)/naming.c \
-    $(SRCDIR)/rcp_persist.c \
     $(SRCDIR)/rcp_point.c \
-    $(SRCDIR)/rcp_route.c \
     $(SRCDIR)/rcp_sensor.c \
     $(SRCDIR)/rcp_signal.c \
-    $(SRCDIR)/rcp_sim.c \
     $(SRCDIR)/rcp_track.c \
     $(SRCDIR)/rcp_train.c \
-    $(SRCDIR)/rcp_ui.c \
     $(SRCDIR)/rcp_util.c \
-    $(SRCDIR)/conjob.c
+    $(SRCDIR)/conjob.c \
+    $(SRCDIR)/terminal.c \
+    $(SRCDIR)/mcu_plugin.c
 
+# Test sources. The suite is not present yet; the target below degrades to a
+# clear message rather than a make error when tests/ is absent.
 TEST_SRC := \
     $(TESTDIR)/test_main.c \
     $(TESTDIR)/test_interlock.c \
@@ -155,16 +161,51 @@ endif
 # They exist so a layout or policy change can be checked before it ships.
 # ---------------------------------------------------------------------------
 NAMESTOOL := $(BUILD)/names_tool$(EXE)
+AUTHTOOL  := $(BUILD)/auth_console$(EXE)
 
 $(NAMESTOOL): tools/names_tool.c $(LIB_OBJ)
 	@$(call MKDIRP,$(BUILD))
 	$(CC) $(CFLAGS) $(INCLUDES) tools/names_tool.c $(LIB_OBJ) -o $@ $(LDFLAGS) $(LDLIBS)
 
-.PHONY: namestool
+$(AUTHTOOL): tools/auth_console.c $(LIB_OBJ)
+	@$(call MKDIRP,$(BUILD))
+	$(CC) $(CFLAGS) $(INCLUDES) tools/auth_console.c $(LIB_OBJ) -o $@ $(LDFLAGS) $(LDLIBS)
+
+.PHONY: namestool authtool tools
 
 namestool: $(NAMESTOOL)
 	@echo "Built $(NAMESTOOL)"
 	$(NAMESTOOL)
+
+authtool: $(AUTHTOOL)
+	@echo "Built $(AUTHTOOL)"
+	$(AUTHTOOL) --accounts
+
+tools: $(NAMESTOOL) $(AUTHTOOL)
+	@echo "Built $(NAMESTOOL) and $(AUTHTOOL)"
+
+# ---------------------------------------------------------------------------
+# Distribution
+#
+# Build every front end and copy the finished binaries into output/, which is
+# the folder you hand to somebody. Objects stay in build/ - nothing
+# intermediate is left in output/.
+# ---------------------------------------------------------------------------
+.PHONY: dist dist-console dist-gui dist-tools
+
+dist: $(TARGET) $(GUITARGET) $(NAMESTOOL) $(AUTHTOOL)
+	@$(call MKDIRP,$(OUTDIR))
+	@echo "Copying binaries into $(OUTDIR)/ ..."
+	$(CP) $(TARGET)    $(OUTDIR)/
+	$(CP) $(GUITARGET) $(OUTDIR)/
+	$(CP) $(NAMESTOOL) $(OUTDIR)/
+	$(CP) $(AUTHTOOL)  $(OUTDIR)/
+	@echo ""
+	@echo "$(OUTDIR)/ contains:"
+	@echo "  $(notdir $(TARGET))     - signaller console"
+	@echo "  $(notdir $(GUITARGET)) - Win32 dispatch console"
+	@echo "  $(notdir $(NAMESTOOL)) - naming diagnostics"
+	@echo "  $(notdir $(AUTHTOOL))  - account console"
 
 # ---------------------------------------------------------------------------
 # Targets
@@ -193,8 +234,20 @@ run: $(TARGET)
 sim: $(TARGET)
 	$(TARGET) --simulate 60 --scenario peak --user admin --password Admin#2024
 
+ifeq ($(wildcard $(TESTDIR)),)
+# The unit-test suite is not present in this tree. Say so plainly rather than
+# letting make fail with "No rule to make target 'tests/test_main.c'".
+.PHONY: test
+
+test:
+	@echo "The unit-test suite is not present in this tree (no $(TESTDIR)/ directory)."
+	@echo "Build and run the tools instead:  make namestool"
+else
+
 test: $(TESTBIN)
 	$(TESTBIN)
+
+endif
 
 demo: $(TARGET)
 	$(TARGET) --batch examples/route-set.txt --user admin --password Admin#2024
@@ -206,9 +259,11 @@ help:
 	@echo "RailControl targets:"
 	@echo "  all       build $(TARGET)"
 	@echo "  gui       build $(GUITARGET) (Win32 dispatch console)"
+	@echo "  dist      build everything and copy the binaries into $(OUTDIR)/"
 	@echo "  run       interactive control console"
 	@echo "  sim       60 second headless simulation"
 	@echo "  demo      run the batch example"
 	@echo "  test      build and run the unit tests"
 	@echo "  namestool build and run the naming diagnostics"
+	@echo "  authtool  build and run the account console"
 	@echo "  clean     remove $(BUILD)/"

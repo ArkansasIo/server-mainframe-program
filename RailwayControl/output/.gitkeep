@@ -1,0 +1,7 @@
+# Keeps this directory in the tree.
+#
+# The executables built into this folder are gitignored (*.exe in
+# ../.gitignore), so without this file git would not track the directory at
+# all and a fresh clone would have nowhere to put them.
+#
+# Build them with:  make dist     (or: .\build.ps1)
