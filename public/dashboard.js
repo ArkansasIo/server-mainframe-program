@@ -149,11 +149,45 @@
     }
   })();
 
+  /**
+   * Optional origin for a separately hosted API. Example:
+   *   https://arkansasio.github.io/server-mainframe-program/?api_base=https://api.example.com
+   * GitHub Pages only serves static files; the API must be hosted separately.
+   */
+  const apiBase = (() => {
+    try {
+      const url = new URL(window.location.href);
+      const fromQuery = url.searchParams.get('api_base');
+      if (fromQuery) {
+        const parsed = new URL(fromQuery);
+        const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+        if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && localHost)) {
+          throw new Error('API base must use HTTPS (HTTP is allowed only for localhost).');
+        }
+        window.sessionStorage.setItem('mf.apiBase', parsed.origin);
+        url.searchParams.delete('api_base');
+        window.history.replaceState({}, '', url.toString());
+        return parsed.origin;
+      }
+      return window.sessionStorage.getItem('mf.apiBase') || '';
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('API base')) {
+        console.error(error.message);
+      }
+      return '';
+    }
+  })();
+
+  function apiUrl(url) {
+    if (!apiBase || !url.startsWith('/')) return url;
+    return `${apiBase}${url}`;
+  }
+
   async function fetchJson(url) {
     const headers = { accept: 'application/json' };
     if (authKey) headers.authorization = `Bearer ${authKey}`;
 
-    const response = await fetch(url, { headers });
+    const response = await fetch(apiUrl(url), { headers });
 
     if (response.status === 401) {
       throw new Error(
