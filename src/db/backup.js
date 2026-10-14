@@ -34,14 +34,21 @@ function timestamp(date = new Date()) {
  * The backup filename for a database and a moment.
  * @returns {string} absolute path
  */
+function databaseBaseName(databaseFile) {
+  // Treat both separators as path separators so Windows-style paths behave
+  // consistently when the code is tested or run on POSIX hosts.
+  const normalized = String(databaseFile).replace(/\\/g, '/');
+  return path.posix.basename(normalized, path.posix.extname(normalized));
+}
+
 function backupPath(directory, databaseFile, date) {
-  const base = path.basename(databaseFile, path.extname(databaseFile));
+  const base = databaseBaseName(databaseFile);
   return path.join(directory, `${base}-${timestamp(date)}.db`);
 }
 
 /** List existing backups for a database, oldest first. */
 function listBackups(directory, databaseFile) {
-  const base = path.basename(databaseFile, path.extname(databaseFile));
+  const base = databaseBaseName(databaseFile);
 
   let entries;
   try {
