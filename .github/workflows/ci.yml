@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "chore/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Node.js tests and syntax
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Syntax-check source and scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find src scripts tests -type f -name '*.js' -print0)
+      - name: Run test suite
+        run: npm test
+      - name: Check SQL query library
+        run: npm run db:check-queries
+  native:
+    name: CMake native build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build build-essential libsqlite3-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DMF_BUILD_TESTS=ON -DMF_BUNDLED_SQLITE=OFF
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Run CTest
+        run: ctest --test-dir build --output-on-failure
