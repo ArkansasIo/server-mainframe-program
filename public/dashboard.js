@@ -149,11 +149,38 @@
     }
   })();
 
+  // GitHub Pages hosts the static UI only. Allow an HTTPS API origin to be
+  // supplied as ?api_base=https://api.example.com for a separately hosted API.
+  const apiBase = (() => {
+    try {
+      const url = new URL(window.location.href);
+      const fromQuery = url.searchParams.get('api_base');
+      if (fromQuery) {
+        const parsed = new URL(fromQuery);
+        if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+          throw new Error('API base must use HTTPS');
+        }
+        window.sessionStorage.setItem('mf.apiBase', parsed.origin);
+        url.searchParams.delete('api_base');
+        window.history.replaceState({}, '', url.toString());
+        return parsed.origin;
+      }
+      return window.sessionStorage.getItem('mf.apiBase') || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  function apiUrl(url) {
+    if (!apiBase) return url;
+    return `${apiBase}${url.startsWith('/') ? url : `/${url}`}`;
+  }
+
   async function fetchJson(url) {
     const headers = { accept: 'application/json' };
     if (authKey) headers.authorization = `Bearer ${authKey}`;
 
-    const response = await fetch(url, { headers });
+    const response = await fetch(apiUrl(url), { headers });
 
     if (response.status === 401) {
       throw new Error(
