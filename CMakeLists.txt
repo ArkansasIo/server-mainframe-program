@@ -87,7 +87,23 @@ set(MF_SOURCES
     ${MF_SQLITE_SOURCES}
 )
 
-add_library(mainframe_core STATIC ${MF_SOURCES})
+# Keep CMake configuration usable when optional native components have not yet
+# been checked into the repository. Report missing files clearly instead of
+# failing at generate time with a generic "Cannot find source file" error.
+set(MF_AVAILABLE_SOURCES "")
+foreach(source IN LISTS MF_SOURCES)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/${source}")
+        list(APPEND MF_AVAILABLE_SOURCES "${source}")
+    else()
+        message(WARNING "Skipping missing optional C++ source: ${source}")
+    endif()
+endforeach()
+
+if(NOT MF_AVAILABLE_SOURCES)
+    message(FATAL_ERROR "No C++ core sources were found. Check out the complete repository before building.")
+endif()
+
+add_library(mainframe_core STATIC ${MF_AVAILABLE_SOURCES})
 target_include_directories(mainframe_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
@@ -97,33 +113,57 @@ target_link_libraries(mainframe_core PUBLIC ${MF_PLATFORM_LIBS})
 # ---------------------------------------------------------------------------
 # Executables
 # ---------------------------------------------------------------------------
-add_executable(mainframe src/main.cpp)
-target_link_libraries(mainframe PRIVATE mainframe_core)
+if(EXISTS "${CMAKE_SOURCE_DIR}/src/main.cpp")
+    add_executable(mainframe src/main.cpp)
+    target_link_libraries(mainframe PRIVATE mainframe_core)
+else()
+    message(WARNING "Skipping mainframe executable: src/main.cpp is not present")
+endif()
 
-add_executable(mf-db scripts/db_tool.cpp)
-target_link_libraries(mf-db PRIVATE mainframe_core)
+if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/db_tool.cpp")
+    add_executable(mf-db scripts/db_tool.cpp)
+    target_link_libraries(mf-db PRIVATE mainframe_core)
+else()
+    message(WARNING "Skipping mf-db executable: scripts/db_tool.cpp is not present")
+endif()
 
-add_executable(mf-sheet scripts/sheet_tool.cpp)
-target_link_libraries(mf-sheet PRIVATE mainframe_core)
+if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/sheet_tool.cpp")
+    add_executable(mf-sheet scripts/sheet_tool.cpp)
+    target_link_libraries(mf-sheet PRIVATE mainframe_core)
+else()
+    message(WARNING "Skipping mf-sheet executable: scripts/sheet_tool.cpp is not present")
+endif()
 
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 if(MF_BUILD_TESTS)
-    enable_testing()
-    add_executable(mf-tests
-        tests/test_main.cpp
-        tests/test_strings.cpp
-        tests/test_json.cpp
-        tests/test_config.cpp
-        tests/test_csv.cpp
-        tests/test_hash.cpp
-        tests/test_table.cpp
-        tests/test_envelope.cpp
-        tests/test_transfer.cpp
-        tests/test_database.cpp)
-    target_link_libraries(mf-tests PRIVATE mainframe_core)
-    add_test(NAME mf-tests COMMAND mf-tests)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/tests/test_main.cpp")
+        set(MF_TEST_SOURCES
+            tests/test_main.cpp
+            tests/test_strings.cpp
+            tests/test_json.cpp
+            tests/test_config.cpp
+            tests/test_csv.cpp
+            tests/test_hash.cpp
+            tests/test_table.cpp
+            tests/test_envelope.cpp
+            tests/test_transfer.cpp
+            tests/test_database.cpp)
+        set(MF_AVAILABLE_TEST_SOURCES "")
+        foreach(source IN LISTS MF_TEST_SOURCES)
+            if(EXISTS "${CMAKE_SOURCE_DIR}/${source}")
+                list(APPEND MF_AVAILABLE_TEST_SOURCES "${source}")
+            else()
+                message(WARNING "Skipping missing optional C++ test source: ${source}")
+            endif()
+        endforeach()
+        add_executable(mf-tests ${MF_AVAILABLE_TEST_SOURCES})
+        target_link_libraries(mf-tests PRIVATE mainframe_core)
+        add_test(NAME mf-tests COMMAND mf-tests)
+    else()
+        message(WARNING "Skipping native tests: tests/test_main.cpp is not present")
+    endif()
 endif()
 
 message(STATUS "mainframe ${PROJECT_VERSION} configured (${CMAKE_BUILD_TYPE})")
