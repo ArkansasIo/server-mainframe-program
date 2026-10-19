@@ -29,6 +29,8 @@
 <script>
   window.MF_BOOTSTRAP = {
     system: { name: 'MAINFRAME', sysplex: 'SYSPLEX', region: 'DEFAULT', version: '1.0.0' },
+    // GitHub Pages serves static files only; skip API/storage boot checks.
+    static: true,
     panels: [],
     httpPort: location.port || 8080,
     terminalPort: 3270,
