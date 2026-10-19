@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Mainframe Server System operator console">
+<title>Operator Console</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./dashboard.css">
+</head>
+<body>
+<div id="app"></div>
+<script>
+  window.MF_BOOTSTRAP = {
+    system: { name: 'MAINFRAME', sysplex: 'SYSPLEX', region: 'DEFAULT', version: '1.0.0' },
+    panels: [],
+    httpPort: location.port || 443,
+    terminalPort: 3270,
+    dataPort: 3271,
+    generatedAt: new Date().toISOString(),
+    static: true
+  };
+</script>
+<script src="./components.js"></script>
+<script src="./keybinds.js"></script>
+<script src="./views.js"></script>
+<script src="./dashboard.js"></script>
+</body>
+</html>
