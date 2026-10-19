@@ -4,22 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<meta name="description" content="Mainframe Server System operator console">
+<meta name="description" content="Mainframe Server System operator console and RailwayControl simulator">
 <title>Operator Console</title>
-<link rel="icon" href="./favicon.svg?v=1.0.4" type="image/svg+xml">
-<link rel="stylesheet" href="./dashboard.css?v=1.0.4">
-<link rel="stylesheet" href="./railway-control.css?v=1.0.0">
+<link rel="icon" href="./favicon.svg?v=1.0.5" type="image/svg+xml">
+<link rel="stylesheet" href="./dashboard.css?v=1.0.5">
+<link rel="stylesheet" href="./railway-control.css?v=1.0.5">
+<link rel="stylesheet" href="./railway-design.css?v=1.0.5">
 </head>
 <body>
 <div id="app"><noscript><p style="font-family:monospace;color:#d7e3ee;background:#0b0f14;padding:16px">The operator console requires JavaScript. The terminal gateway on port 3270 works without a browser.</p></noscript></div>
 <script>
 window.MF_BOOTSTRAP={system:{name:'MAINFRAME',sysplex:'SYSPLEX',region:'DEFAULT',version:'1.0.0'},static:true,panels:[],httpPort:location.port||8080,terminalPort:3270,dataPort:3271,generatedAt:new Date().toISOString()};
 </script>
-<script src="./components.js?v=1.0.4"></script>
-<script src="./keybinds.js?v=1.0.4"></script>
-<script src="./views.js?v=1.0.4"></script>
-<script src="./dashboard.js?v=1.0.4"></script>
-<script src="./railway-control.js?v=1.0.4"></script>
-<script src="./menu-features.js?v=1.0.4"></script>
+<script src="./components.js?v=1.0.5"></script>
+<script src="./keybinds.js?v=1.0.5"></script>
+<script src="./views.js?v=1.0.5"></script>
+<script src="./dashboard.js?v=1.0.5"></script>
+<script src="./railway-api.js?v=1.0.5"></script>
+<script src="./railway-control.js?v=1.0.5"></script>
+<script src="./railway-dispatcher.js?v=1.0.5"></script>
+<script src="./railway-designer.js?v=1.0.5"></script>
+<script src="./railway-console.js?v=1.0.5"></script>
+<script src="./menu-features.js?v=1.0.5"></script>
 </body>
 </html>
