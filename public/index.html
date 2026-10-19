@@ -6,39 +6,20 @@
 <meta name="color-scheme" content="dark light">
 <meta name="description" content="Mainframe Server System operator console">
 <title>Operator Console</title>
-<link rel="icon" href="./favicon.svg?v=1.0.3" type="image/svg+xml">
-<link rel="stylesheet" href="./dashboard.css?v=1.0.3">
+<link rel="icon" href="./favicon.svg?v=1.0.4" type="image/svg+xml">
+<link rel="stylesheet" href="./dashboard.css?v=1.0.4">
+<link rel="stylesheet" href="./railway-control.css?v=1.0.0">
 </head>
 <body>
-<div id="app">
-  <noscript>
-    <p style="font-family:monospace;color:#d7e3ee;background:#0b0f14;padding:16px">
-      The operator console requires JavaScript. The terminal gateway on port 3270 works without a browser.
-    </p>
-  </noscript>
-</div>
-
+<div id="app"><noscript><p style="font-family:monospace;color:#d7e3ee;background:#0b0f14;padding:16px">The operator console requires JavaScript. The terminal gateway on port 3270 works without a browser.</p></noscript></div>
 <script>
-  // GitHub Pages is static hosting. Do not attempt to boot the live API,
-  // database, or TCP services from this page.
-  window.MF_BOOTSTRAP = {
-    system: { name: 'MAINFRAME', sysplex: 'SYSPLEX', region: 'DEFAULT', version: '1.0.0' },
-    static: true,
-    panels: [],
-    httpPort: location.port || 8080,
-    terminalPort: 3270,
-    dataPort: 3271,
-    generatedAt: new Date().toISOString()
-  };
+window.MF_BOOTSTRAP={system:{name:'MAINFRAME',sysplex:'SYSPLEX',region:'DEFAULT',version:'1.0.0'},static:true,panels:[],httpPort:location.port||8080,terminalPort:3270,dataPort:3271,generatedAt:new Date().toISOString()};
 </script>
-
-<!-- Versioned URLs force browsers/CDNs to load the current UI bundle. -->
-<script src="./components.js?v=1.0.3"></script>
-<script src="./keybinds.js?v=1.0.3"></script>
-<script src="./views.js?v=1.0.3"></script>
-<script src="./dashboard.js?v=1.0.3"></script>
-<script src="./railway-control.js?v=1.0.3"></script>
-<script src="./menu-features.js?v=1.0.3"></script>
-
+<script src="./components.js?v=1.0.4"></script>
+<script src="./keybinds.js?v=1.0.4"></script>
+<script src="./views.js?v=1.0.4"></script>
+<script src="./dashboard.js?v=1.0.4"></script>
+<script src="./railway-control.js?v=1.0.4"></script>
+<script src="./menu-features.js?v=1.0.4"></script>
 </body>
 </html>
