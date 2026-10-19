@@ -5,6 +5,7 @@ const { sendJson, sendError, escapeHtml } = require('./respond');
 const { createStaticHandler } = require('./static');
 const { createAuthPolicy, createAuthGuard } = require('./auth');
 const { createRailwayRoutes } = require('./railway');
+const { createRailwayCommandRoutes } = require('./railway-commands');
 
 function allowedTables(config) {
   const fromConfig = (config.spreadsheet.tables || []).map((t) => String(t.name || '').toLowerCase());
@@ -17,7 +18,7 @@ function readRows(db, table, limit) { const size = Math.min(Math.max(Number(limi
 function renderDashboard(config) {
   const panels = (config.spreadsheet.tables || []).map((t) => ({ id: t.name.toLowerCase(), table: t.name.toLowerCase(), label: t.name }));
   const bootstrap = { system: { name: config.system.name, sysplex: config.system.sysplex, region: config.system.region, version: config.system.version || '1.0.0' }, panels, httpPort: config.http.port, terminalPort: config.tcp.terminalPort, dataPort: config.tcp.dataPort, generatedAt: new Date().toISOString() };
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(config.system.name)} - Operator Console</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/dashboard.css"></head><body><div id="app"></div><script>window.MF_BOOTSTRAP = ${JSON.stringify(bootstrap).replace(/</g, '\\u003c')};</script><script src="/components.js"></script><script src="/keybinds.js"></script><script src="/views.js"></script><script src="/dashboard.js"></script><script src="/railway-control.js"></script><script src="/menu-features.js"></script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(config.system.name)} - Operator Console</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/dashboard.css"></head><body><div id="app"></div><script>window.MF_BOOTSTRAP = ${JSON.stringify(bootstrap).replace(/</g, '\\u003c')};</script><script src="/components.js"></script><script src="/keybinds.js"></script><script src="/views.js"></script><script src="/dashboard.js"></script><script src="/railway-api.js"></script><script src="/railway-control.js"></script><script src="/menu-features.js"></script></body></html>`;
 }
 
 function dashboardMenu(config) {
@@ -40,7 +41,7 @@ function createRoutes(ctx) {
     { method: 'GET', path: '/', description: 'Operator dashboard', handler: (req, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(renderDashboard(config)); } },
     { method: 'GET', path: '/index.html', description: 'Alias of /', handler: (req, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(renderDashboard(config)); } },
   ];
-  return routes.concat(createRailwayRoutes({ sendJson, sendError }));
+  return routes.concat(createRailwayRoutes({ sendJson, sendError },), createRailwayCommandRoutes({ sendJson }));
 }
 
 function startHttpServer(config, db, logger, deps = {}) {
