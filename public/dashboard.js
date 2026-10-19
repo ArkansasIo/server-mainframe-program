@@ -1035,9 +1035,46 @@
     renderTable();
     renderStatus();
 
-    // The loader advances on real work, never on a timer: each step fires
-    // only once the thing it names has actually finished.
-    runBootSequence();
+    // GitHub Pages is a static host and cannot provide /api/* or TCP
+    // gateways. Use an honest local-only startup path instead of reporting
+    // a storage failure when this demo dashboard is opened from static hosting.
+    const isStaticHost = Boolean((window.MF_BOOTSTRAP || {}).static)
+      || window.location.protocol === 'file:'
+      || window.location.hostname.endsWith('github.io');
+    if (isStaticHost) runStaticBootSequence();
+    else runBootSequence();
+  }
+
+  /**
+   * Bring up the static dashboard without pretending that a remote storage
+   * subsystem, SQL database, or TCP gateway exists. Static hosts can serve
+   * browser assets only; live telemetry requires a separately hosted API.
+   */
+  async function runStaticBootSequence() {
+    const info = (window.MF_BOOTSTRAP && window.MF_BOOTSTRAP.system) || {};
+    const boot = UI.createBootLoader({
+      document: doc,
+      system: info.name || 'MAINFRAME',
+      version: info.version || '1.0.0',
+      steps: ['Static assets', 'Console interface'],
+    });
+    doc.body.appendChild(boot.root);
+    boot.banner({ sysplex: info.sysplex, region: info.region });
+    boot.emit('console: static dashboard host detected');
+    boot.step('done', 'assets: browser modules loaded');
+    boot.emit('api: live server not configured');
+    boot.step('done', 'console: demo mode ready');
+    await boot.finish('Static dashboard ready. Configure an API base to connect a live server.');
+    state.booted = true;
+    state.system = {
+      system: info.name || 'MAINFRAME',
+      sysplex: info.sysplex || 'SYSPLEX',
+      region: info.region || 'DEFAULT',
+      version: info.version || '1.0.0',
+      status: 'static-demo',
+    };
+    renderStatus();
+    window.setTimeout(() => boot.remove(), 420);
   }
 
   /**
