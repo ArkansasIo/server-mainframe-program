@@ -38,6 +38,7 @@ jobs:
           test -f public/components.js
           test -f public/keybinds.js
           test -f public/views.js
+          test -f public/menu-features.js
           test -f public/favicon.svg
           # Project pages are hosted below /<repository>/, so asset URLs must
           # remain relative rather than point at the domain root.
@@ -53,6 +54,7 @@ jobs:
           node --check public/components.js
           node --check public/keybinds.js
           node --check public/views.js
+          node --check public/menu-features.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
