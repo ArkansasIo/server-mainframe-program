@@ -1,112 +1,23 @@
 'use strict';
 
-/*
- * MAINFRAME RailwayControl / Train Operations front-end.
- *
- * The actual simulator remains RailwayControl/ and is built as rcp.exe or
- * rcp-gui.exe. This browser panel makes that program visible from the MAINFRAME
- * operator console and documents the live train-control command surface. It is
- * deliberately a simulator dashboard; it does not claim to control real rail
- * equipment.
- */
+/* MAINFRAME RailwayControl browser UI. Simulation only; never a real railway controller. */
 (function railwayControlModule(global) {
-  const doc = global.document;
-  let overlay = null;
-
-  const trains = [
-    { id: '1A34', className: 'PASSENGER', state: 'READY', section: 'T1', speed: '0 km/h', authority: 'R2' },
-    { id: '2B17', className: 'FREIGHT', state: 'HELD', section: 'T3', speed: '0 km/h', authority: 'NONE' },
-    { id: '3C05', className: 'MAINTENANCE', state: 'READY', section: 'T5', speed: '0 km/h', authority: 'NONE' },
-  ];
-
-  function el(tag, attrs = {}, children = []) {
-    const node = doc.createElement(tag);
-    Object.entries(attrs).forEach(([key, value]) => {
-      if (key === 'text') node.textContent = value;
-      else if (key === 'className') node.className = value;
-      else node.setAttribute(key, value);
-    });
-    children.forEach((child) => node.appendChild(child));
-    return node;
-  }
-
-  function close() {
-    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    overlay = null;
-  }
-
-  function commandLine(text) {
-    const line = el('div', { className: 'mf-rail-command', text: `> ${text}` });
-    return line;
-  }
-
-  function open() {
-    if (overlay) return;
-
-    const panel = el('div', { className: 'mf-dialog mf-railway-panel', role: 'dialog', 'aria-modal': 'true' });
-    const title = el('div', { className: 'mf-game-title', text: 'RAILWAY CONTROL / TRAIN OPERATIONS' });
-    const subtitle = el('div', {
-      className: 'mf-game-subtitle',
-      text: 'MAINFRAME subsystem · Railway Traffic Management & Interlocking Simulator',
-    });
-    panel.appendChild(title);
-    panel.appendChild(subtitle);
-
-    const banner = el('div', { className: 'mf-rail-banner' });
-    banner.appendChild(el('strong', { text: 'SIMULATOR ONLINE' }));
-    banner.appendChild(el('span', { text: '  |  Interlocking: ACTIVE  |  ATC: ACTIVE  |  Track circuits: ACTIVE' }));
-    panel.appendChild(banner);
-
-    const table = el('table', { className: 'mf-table' });
-    table.appendChild(el('thead', {}, [el('tr', {}, [
-      el('th', { text: 'Train' }), el('th', { text: 'Class' }), el('th', { text: 'State' }),
-      el('th', { text: 'Section' }), el('th', { text: 'Speed' }), el('th', { text: 'Authority' }),
-    ])]));
-    const body = el('tbody');
-    trains.forEach((train) => {
-      body.appendChild(el('tr', {}, [
-        el('td', { text: train.id }), el('td', { text: train.className }),
-        el('td', { text: train.state }), el('td', { text: train.section }),
-        el('td', { text: train.speed }), el('td', { text: train.authority }),
-      ]));
-    });
-    table.appendChild(body);
-    panel.appendChild(table);
-
-    const controls = el('div', { className: 'mf-dialog-actions' });
-    [
-      ['LIST TRAINS', 'List all simulator trains'],
-      ['DISPATCH R2', 'Set route R2 and give authority to the first train'],
-      ['TRAIN 1A34 RUN', 'Request train 1A34 to run'],
-      ['TRAIN 2B17 HOLD', 'Hold train 2B17'],
-      ['EMERGENCY STOP', 'Stop the simulator movement clock'],
-    ].forEach(([label, hint]) => {
-      const button = el('button', { className: 'mf-btn', type: 'button', text: label, title: hint });
-      button.addEventListener('click', () => {
-        output.appendChild(commandLine(label));
-        output.scrollTop = output.scrollHeight;
-      });
-      controls.appendChild(button);
-    });
-    panel.appendChild(controls);
-
-    const output = el('div', { className: 'mf-rail-output' });
-    output.appendChild(commandLine('RailwayControl simulator interface ready'));
-    output.appendChild(commandLine('Use RailwayControl/build/rcp-gui.exe for the native live dispatch diagram'));
-    panel.appendChild(output);
-
-    const footer = el('div', { className: 'mf-dialog-actions' });
-    const closeButton = el('button', { className: 'mf-btn is-primary', type: 'button', text: 'Close' });
-    closeButton.addEventListener('click', close);
-    footer.appendChild(closeButton);
-    panel.appendChild(footer);
-
-    overlay = el('div', { className: 'mf-overlay' }, [panel]);
-    overlay.addEventListener('click', (event) => {
-      if (event.target === overlay) close();
-    });
-    doc.body.appendChild(overlay);
-  }
-
-  global.MFRailwayControl = { open, close };
+  const doc = global.document; let overlay = null; let state = null; let poll = null;
+  const fallback = { system:{name:'MAINFRAME RAILWAY CONTROL',mode:'SIMULATION',interlocking:'ACTIVE',atc:'ACTIVE',trackCircuits:'ACTIVE',emergency:false}, sections:[{id:'T1',name:'North Platform',occupied:true,locked:true},{id:'T2',name:'North Junction',occupied:false,locked:true},{id:'T3',name:'Freight Siding',occupied:true,locked:false},{id:'T4',name:'Central Main',occupied:false,locked:true},{id:'T5',name:'Depot Lead',occupied:true,locked:false},{id:'T6',name:'South Platform',occupied:false,locked:false}], points:[{id:'P1',name:'North Junction',position:'NORMAL',locked:true},{id:'P2',name:'Depot Turnout',position:'REVERSE',locked:false}], signals:[{id:'S1',name:'North Home',aspect:'GREEN',section:'T1'},{id:'S2',name:'Junction',aspect:'YELLOW',section:'T2'},{id:'S3',name:'Freight',aspect:'RED',section:'T3'},{id:'S4',name:'Central',aspect:'GREEN',section:'T4'},{id:'S5',name:'Depot',aspect:'RED',section:'T5'},{id:'S6',name:'South Home',aspect:'RED',section:'T6'}], trains:[{id:'1A34',className:'PASSENGER',state:'READY',section:'T1',speedKph:0,authority:'R2',destination:'T6',consist:6},{id:'2B17',className:'FREIGHT',state:'HELD',section:'T3',speedKph:0,authority:'NONE',destination:'T5',consist:42},{id:'3C05',className:'MAINTENANCE',state:'READY',section:'T5',speedKph:0,authority:'NONE',destination:'T2',consist:3}],routes:[{id:'R1',from:'S1',to:'S2',state:'RELEASED',locked:false,train:null},{id:'R2',from:'S2',to:'S4',state:'SET',locked:true,train:'1A34'},{id:'R3',from:'S5',to:'S6',state:'RELEASED',locked:false,train:null}],alarms:[],events:[{timestamp:new Date().toISOString(),type:'SYSTEM',severity:'INFO',message:'Static Pages simulator fallback active'}]};
+  const el=(tag,attrs={},children=[])=>{const n=doc.createElement(tag);Object.entries(attrs).forEach(([k,v])=>k==='text'?n.textContent=v:k==='className'?n.className=v:n.setAttribute(k,v));children.forEach(c=>n.appendChild(c));return n;};
+  const clone=(v)=>JSON.parse(JSON.stringify(v));
+  async function request(path,options){if(global.location.protocol!=='http:'&&global.location.protocol!=='https:')throw new Error('static-host');const r=await fetch(path,{cache:'no-store',...(options||{}),headers:{'content-type':'application/json',...((options&&options.headers)||{})}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}
+  async function refresh(){try{state=await request('/api/railway/status');return true;}catch{if(!state)state=clone(fallback);return false;}}
+  async function command(op,args={}){try{const result=await request('/api/railway/command',{method:'POST',body:JSON.stringify({command:op,args})});await refresh();return result;}catch{const train=args.train&&state.trains.find(x=>x.id===String(args.train).toUpperCase());if(op==='RUN'&&train&&!state.system.emergency){train.state='RUNNING';train.speedKph=Number(args.speed)||25;}if(op==='HOLD'&&train){train.state='HELD';train.speedKph=0;}if(op==='ESTOP'){state.system.emergency=true;state.trains.forEach(x=>{x.state='EMERGENCY_STOP';x.speedKph=0;});}if(op==='RESET_ESTOP'){state.system.emergency=false;state.trains.forEach(x=>{if(x.state==='EMERGENCY_STOP')x.state='HELD';});}state.events.unshift({timestamp:new Date().toISOString(),type:'LOCAL',severity:'INFO',message:`${op} ${args.train||args.route||''}`.trim()});return{ok:true,local:true};}}
+  function close(){if(poll)global.clearInterval(poll);poll=null;if(overlay)overlay.remove();overlay=null;}
+  function badge(text,kind=''){return el('span',{className:`mf-rail-badge ${kind}`,text});}
+  function section(title,children){return el('section',{className:'mf-rail-section'},[el('h3',{text:title}),...children]);}
+  function table(headers,rows){const t=el('table',{className:'mf-table mf-rail-table'});t.appendChild(el('thead',{},[el('tr',{},headers.map(h=>el('th',{text:h})))]));const b=el('tbody');rows.forEach(r=>b.appendChild(el('tr',{},r.map(x=>el('td',{text:String(x==null?'':x)})))));t.appendChild(b);return t;}
+  function renderOverview(host){host.replaceChildren();const s=state.system;const cards=[['MODE',s.mode,'ok'],['INTERLOCKING',s.interlocking,'ok'],['ATC',s.atc,'ok'],['TRACK CIRCUITS',s.trackCircuits,'ok'],['EMERGENCY',s.emergency?'ACTIVE':'CLEAR',s.emergency?'alarm':'ok']];host.appendChild(el('div',{className:'mf-rail-cards'},cards.map(([a,b,c])=>el('div',{className:'mf-rail-card'},[el('small',{text:a}),badge(b,c)]))));host.appendChild(section('Track Occupancy',[table(['Section','Name','Occupied','Locked'],state.sections.map(x=>[x.id,x.name,x.occupied?'YES':'NO',x.locked?'YES':'NO']))]));host.appendChild(section('Route Plan',[table(['Route','From','To','State','Lock','Train'],state.routes.map(x=>[x.id,x.from,x.to,x.state,x.locked?'LOCKED':'FREE',x.train||'-']))]));}
+  function renderTrains(host){host.replaceChildren();host.appendChild(table(['Train','Class','State','Section','Speed','Authority','Destination','Consist'],state.trains.map(x=>[x.id,x.className,x.state,x.section,`${x.speedKph} km/h`,x.authority,x.destination,x.consist])));const actions=el('div',{className:'mf-rail-action-grid'});state.trains.forEach(train=>{const g=el('div',{className:'mf-rail-train-actions'},[el('strong',{text:train.id})]);[['RUN','RUN'],['HOLD','HOLD']].forEach(([op,label])=>{const b=el('button',{className:'mf-btn',type:'button',text:label});b.onclick=async()=>{await command(op,{train:train.id});render();};g.appendChild(b);});actions.appendChild(g);});host.appendChild(actions);}
+  function renderInterlocking(host){host.replaceChildren();host.appendChild(section('Signals',[table(['ID','Name','Aspect','Section'],state.signals.map(x=>[x.id,x.name,x.aspect,x.section]))]));host.appendChild(section('Points',[table(['ID','Name','Position','Lock'],state.points.map(x=>[x.id,x.name,x.position,x.locked?'LOCKED':'FREE']))]));host.appendChild(section('Routes',[table(['Route','State','Locked','Train'],state.routes.map(x=>[x.id,x.state,x.locked?'YES':'NO',x.train||'-']))]));}
+  function renderEvents(host){host.replaceChildren();host.appendChild(table(['Time','Type','Severity','Message'],state.events.slice(0,100).map(x=>[new Date(x.timestamp).toLocaleTimeString(),x.type,x.severity,x.message])));}
+  function render(){if(!overlay||!state)return;const host=overlay.querySelector('.mf-rail-content');const active=overlay.querySelector('.mf-rail-tab.is-active');const tab=active?active.dataset.tab:'overview';if(tab==='trains')renderTrains(host);else if(tab==='interlocking')renderInterlocking(host);else if(tab==='events')renderEvents(host);else renderOverview(host);overlay.querySelector('.mf-rail-connection').textContent=(global.MF_BOOTSTRAP&&global.MF_BOOTSTRAP.static)?'STATIC SIMULATOR':'API SIMULATOR';}
+  async function open(){if(overlay)return;await refresh();overlay=el('div',{className:'mf-overlay mf-rail-overlay'});const panel=el('div',{className:'mf-dialog mf-dialog-wide mf-railway-panel',role:'dialog','aria-modal':'true','aria-label':'Railway Control'});panel.appendChild(el('div',{className:'mf-rail-head'},[el('div',{},[el('div',{className:'mf-game-title',text:'RAILWAY CONTROL / TRAIN OPERATIONS'}),el('div',{className:'mf-game-subtitle',text:'MAINFRAME · CTC / TMS / SCADA / INTERLOCKING SIMULATOR'})]),el('div',{className:'mf-rail-connection',text:'CONNECTING'})]));panel.appendChild(el('div',{className:'mf-rail-warning',text:'SIMULATION ONLY — not certified for real-world railway control or safety-critical equipment.'}));const tabs=el('div',{className:'mf-rail-tabs'});[['overview','Overview'],['trains','Trains'],['interlocking','Interlocking'],['events','Event Log']].forEach(([id,label],i)=>{const b=el('button',{className:`mf-btn mf-rail-tab${i===0?' is-active':''}`,type:'button',text:label});b.dataset.tab=id;b.onclick=()=>{tabs.querySelectorAll('.mf-rail-tab').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');render();};tabs.appendChild(b);});panel.appendChild(tabs);panel.appendChild(el('div',{className:'mf-rail-content'}));const controls=el('div',{className:'mf-dialog-actions mf-rail-global-actions'});[['DISPATCH R2','DISPATCH',{route:'R2',train:'1A34'}],['EMERGENCY STOP','ESTOP',{}],['RESET E-STOP','RESET_ESTOP',{}],['CLEAR ALARMS','CLEAR_ALARMS',{}]].forEach(([label,op,args])=>{const b=el('button',{className:`mf-btn${op==='ESTOP'?' mf-rail-danger':''}`,type:'button',text:label});b.onclick=async()=>{await command(op,args);render();};controls.appendChild(b);});const closeButton=el('button',{className:'mf-btn is-primary',type:'button',text:'Close'});closeButton.onclick=close;controls.appendChild(closeButton);panel.appendChild(controls);overlay.appendChild(panel);overlay.onclick=e=>{if(e.target===overlay)close();};doc.body.appendChild(overlay);render();poll=global.setInterval(async()=>{if(!overlay)return;await refresh();render();},3000);}
+  global.MFRailwayControl={open,close,refresh,command};
 })(window);
