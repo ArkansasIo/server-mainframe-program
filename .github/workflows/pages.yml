@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "public/**"
+      - "src/ui/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -38,11 +39,20 @@ jobs:
           test -f public/keybinds.js
           test -f public/views.js
           test -f public/favicon.svg
-          # Fail early if the static page references a root-absolute asset path.
+          # Project pages are hosted below /<repository>/, so asset URLs must
+          # remain relative rather than point at the domain root.
           if grep -E '(src|href)="/' public/index.html; then
             echo "GitHub Pages project sites require relative asset paths in public/index.html." >&2
             exit 1
           fi
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/dashboard.js
+          node --check public/components.js
+          node --check public/keybinds.js
+          node --check public/views.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
