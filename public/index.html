@@ -6,18 +6,10 @@
 <meta name="color-scheme" content="dark light">
 <meta name="description" content="Mainframe Server System operator console">
 <title>Operator Console</title>
-<link rel="icon" href="./favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./dashboard.css">
+<link rel="icon" href="./favicon.svg?v=1.0.1" type="image/svg+xml">
+<link rel="stylesheet" href="./dashboard.css?v=1.0.1">
 </head>
 <body>
-
-<!--
-  Fallback document.
-  The Node server renders the live page at "/" with system identity and panel
-  data. This static document is the browser-hosted equivalent for public/.
-  Relative asset URLs are required for repository-subpath hosting on GitHub
-  Pages (/<repository>/).
--->
 <div id="app">
   <noscript>
     <p style="font-family:monospace;color:#d7e3ee;background:#0b0f14;padding:16px">
@@ -27,23 +19,25 @@
 </div>
 
 <script>
+  // GitHub Pages is static hosting. Do not attempt to boot the live API,
+  // database, or TCP services from this page.
   window.MF_BOOTSTRAP = {
     system: { name: 'MAINFRAME', sysplex: 'SYSPLEX', region: 'DEFAULT', version: '1.0.0' },
-    // GitHub Pages serves static files only; skip API/storage boot checks.
     static: true,
     panels: [],
     httpPort: location.port || 8080,
     terminalPort: 3270,
     dataPort: 3271,
-    generatedAt: new Date().toISOString(),
-    static: true
+    generatedAt: new Date().toISOString()
   };
 </script>
 
-<script src="./components.js"></script>
-<script src="./keybinds.js"></script>
-<script src="./views.js"></script>
-<script src="./dashboard.js"></script>
+<!-- Versioned URLs force browsers/CDNs to load the fixed boot logic instead of
+     serving a cached copy that still calls /api/health during static boot. -->
+<script src="./components.js?v=1.0.1"></script>
+<script src="./keybinds.js?v=1.0.1"></script>
+<script src="./views.js?v=1.0.1"></script>
+<script src="./dashboard.js?v=1.0.1"></script>
 
 </body>
 </html>
