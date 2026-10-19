@@ -38,6 +38,11 @@ jobs:
           test -f public/keybinds.js
           test -f public/views.js
           test -f public/favicon.svg
+          # Fail early if the static page references a root-absolute asset path.
+          if grep -E '(src|href)="/' public/index.html; then
+            echo "GitHub Pages project sites require relative asset paths in public/index.html." >&2
+            exit 1
+          fi
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -49,6 +54,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
